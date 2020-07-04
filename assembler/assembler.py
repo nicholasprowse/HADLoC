@@ -8,7 +8,7 @@ from utils import verify_file
 
 
 def assemble(file):
-    file_name = verify_file(file, 'asm', "File must have '.asm' extension")
+    file_name = verify_file(file, 'hdc', "File must have '.hdc' extension")
     tokens = tokenize(file)
     file.close()
     parser = Parser(tokens)

@@ -3,109 +3,13 @@ import sys
 import os
 
 import writer
-import time
 import argparse
 from serial.tools import list_ports
 from serial import SerialException
 import serial
 
 from assembler.assembler import assemble
-from error import ConsoleException, NonTerminatingException
-
-
-def execute(instruction):
-    instruction = instruction.replace('\\ ', '\\s')
-    tokens = instruction.split()
-    if tokens[0] == 'quit':
-        sys.exit(0)
-    if tokens[0] == 'assemble':
-        return execute_assemble(tokens[1:])
-    if tokens[0] == 'write':
-        return execute_write(tokens[1:])
-    if tokens[0] == 'read':
-        return execute_read(tokens[1:])
-    if tokens[0] == 'help':
-        return execite_help()
-
-
-"""
-def execute_read(args):
-    get_serial()
-    if len(args) > 4:
-        raise ConsoleException("Too many arguments", "read [BYTES=256] [BASE=hex] [FILE]")
-
-    num_bytes = 256
-    file = None
-    base = 'hex'
-    if len(args) > 0:
-        if args[0].isdecimal():
-            num_bytes = int(args[0])
-        else:
-            raise ConsoleException("Argument 1 must be a decimal integer", 'read')
-
-    if len(args) > 1:
-        if args[1] in ['bin', 'hex', 'dec']:
-            base = args[1]
-        else:
-            raise ConsoleException("Argument 2 must be one of 'hex', 'dec' or 'bin'", 'read')
-
-    if len(args) > 2:
-        file = open(args[2], 'w')
-    data = writer.read_data(ser, num_bytes)
-    writer.display(data, base)
-    if file is not None:
-        sys.stdout = file
-        writer.display(data, base)
-        sys.stdout = sys.__stdout__
-        file.close()
-    return True
-"""
-
-
-def execute_write(args):
-    ser = get_serial()
-    if len(args) > 1:
-        raise ConsoleException("Too many arguments", 'write')
-
-    if len(args) == 0:
-        raise ConsoleException("Not enough arguments", 'write')
-
-    writer.write_data(ser, args[0])
-    return True
-
-
-def execite_help():
-    print("Each command consists of a name, followed by a series of arguments separated by spaces")
-    print("Arguments inside square brackets are optional arguments")
-    print("If an argument is not given, a default value may be used which is shown inside the square brackets")
-    print("Commands:")
-    print("assemble [x] [x] file")
-    print("\tAssembles the given assembly code file into machine code. The file argument is the full path to the file "
-          "containing assembly code. The file must contain the extension '.asm'. The two optional x arguments can be "
-          "either 'c' or 'w', but they cannot both be the same. If one is 'c' then the assembly will be done 'cleanly',"
-          " meaning that extra unnessecary files will not be generated. The only file created will be the raw binary "
-          "file containing the machine code. If one of the arguments is 'w', then the created machine code file will be"
-          " written to the connected EEPROM")
-    print("translate [x] [x] file")
-    print("\tTranslates the given VM file into machine code. The arguments are the same as for the 'assemble' command "
-          "except that the file must be a VM file with extension '.vm'.")
-    print("compiles [x] [x] file")
-    print("\tCompiles the given file into machine code. The arguments are the same as for the 'assemble' command "
-          "except that the file must be a [LANGUAGE] file with extension '.XXX'.")
-    print("read [bytes=256] [base=hex] [file]")
-    print("\tReads data from the EEPROM and displays the data. The number of bytes read is specified by the 'bytes' "
-          "argument. The results can be printed out in binary, decimal or hexadecimal, "
-          "which is specified by setting the 'base' argument to one of 'bin', 'dec' or 'hex' respectively. "
-          "The full path of a file can be specified in the 'file' argument and the data will be written in the file in "
-          "the same format as it is printed. If no file is provided, the data will not be written to a file.")
-    print("write file")
-    print("\tWrites data to the EEPROM. The 'file' argument is the full path of the file containing the data to write. "
-          "The raw binary data of the file will be written to the EEPROM.")
-    print("quit")
-    print("\tQuits the program")
-    print("help")
-    print("\tDisplays this help message")
-    return True
+from error import NonTerminatingException
 
 
 def get_serial():
@@ -144,70 +48,60 @@ def get_serial():
     return ser
 
 
+INCORRECT_PORT_ERROR = 0
+PORT_DOES_NOT_EXIST_ERROR = 1
+
+
 def connect_serial(device_name):
+    ports = list_ports.comports()
+    if device_name not in [port.device for port in ports]:
+        return PORT_DOES_NOT_EXIST_ERROR
+
     try:
         ser = serial.Serial(device_name, 115200, timeout=2)
     except SerialException:
-        return None
+        return INCORRECT_PORT_ERROR
+
     response = ser.read_until().decode()
     if response == 'Connection acquired\r\n':
         return ser
     else:
-        return None
-
-
-"""
-def execute_assemble(args):
-    if len(args) > 2:
-        raise ConsoleException("Too many arguments", 'assemble')
-
-    if len(args) == 0:
-        raise ConsoleException("Not enough arguments", 'assemble')
-
-    file_name = args[-1].replace('\\s', ' ').replace('\\\\', '\\')
-    options = ''
-    if len(args) == 2:
-        options = args[0]
-
-    clean = 'c' in options
-    write = 'w' in options
-    for c in options:
-        if c not in 'cw':
-            raise ConsoleException("Invalid Option: '{}'".format(c), 'assemble')
-
-    files = assemble(file_name)
-    if clean:
-        for i in range(1, len(files)):
-            os.remove(files[i])
-    if write:
-        writer.write_data(get_serial(), files[0])
-"""
-
-"""
-def parse_compileargs(args):
-    while len(args) < 2:
-        args.append(None)
-    clean = args[0] == 'c' or args[1] == 'c'
-    write = args[0] == 'w' or args[1] == 'w'
-    if args[0] not in ['c', 'w', None]:
-        raise ConsoleError('Invalid first argument')
-
-    if args[1] not in ['c', 'w', None]:
-        raise ConsoleError('Invalid second argument')
-
-    if args[0] == args[1]:
-        raise ConsoleError('Invalid second argument')
-    return clean, write
-"""
+        return INCORRECT_PORT_ERROR
 
 
 def execute_load(args):
-    ser = get_serial()
+    if args.a:
+        ser = find_serialport_auto()
+    elif args.port is not None:
+        ser = connect_serial(args.port)
+        if ser == INCORRECT_PORT_ERROR:
+            print("No EEPROM writer connected to serial port: {}. Please make sure the EEPROM writer is connected, "
+                  "and you select the correct serial port".format(args.port))
+            return
+        elif ser == PORT_DOES_NOT_EXIST_ERROR:
+            print("The serial port '{}' does not exist. For a list of current serial ports use '{} serialports'"
+                  .format(args.port, parser.prog))
+            return
+    else:
+        ser = get_serial()
     writer.write_data(ser, args.file)
 
 
 def execute_read(args):
-    ser = get_serial()
+    if args.a:
+        ser = find_serialport_auto()
+    elif args.port is not None:
+        ser = connect_serial(args.port)
+        if ser == INCORRECT_PORT_ERROR:
+            print("No EEPROM writer connected to serial port: {}. Please make sure the EEPROM writer is connected, "
+                  "and you select the correct serial port".format(args.port))
+            return
+        elif ser == PORT_DOES_NOT_EXIST_ERROR:
+            print("The serial port '{}' does not exist. For a list of current serial ports use '{} serialports'"
+                  .format(args.port, parser.prog))
+            return
+    else:
+        ser = get_serial()
 
     data = writer.read_data(ser, args.bytes)
     base = 'hex' if args.x else ('dec' if args.d else 'bin')
@@ -232,8 +126,14 @@ def execute_assemble(args):
     if args.l:
         if args.port is not None:
             ser = connect_serial(args.port)
-            if ser is None:
-                print("No EEPROM writer connected to serial port: {}".format(args.port))
+            if ser == INCORRECT_PORT_ERROR:
+                print("No EEPROM writer connected to serial port: {}. Please make sure the EEPROM writer is connected, "
+                      "and you select the correct serial port".format(args.port))
+                return
+            elif ser == PORT_DOES_NOT_EXIST_ERROR:
+                print("The serial port '{}' does not exist. For a list of current serial ports use '{} serialports'"
+                      .format(args.port, parser.prog))
+                return
             else:
                 writer.write_data(ser, open(files[0], 'r'))
         elif args.a:
@@ -272,9 +172,9 @@ def find_serialport_auto():
             # Check if usb is in any of these strings. The EEPROM writer is most likely one of these ports, since it
             # must be connected through a usb port
             if 'usb' in description + device + product + hwid:
-                # get the serial port, and print it out if it was connected succesfully (i.e. is not None)
+                # get the serial port, and print it out if it was connected succesfully (i.e. is not an integer (error))
                 ser = connect_serial(port.device)
-                if ser is not None:
+                if type(ser) is not int:
                     return ser
                 checked.append(port.device)
                 finished = False
@@ -285,7 +185,7 @@ def find_serialport_auto():
             for port in ports:
                 if port.device not in checked:
                     ser = connect_serial(port.device)
-                    if ser is not None:
+                    if type(ser) is not int:
                         return ser
                     checked.append(port.device)
                     finished = False
@@ -319,47 +219,13 @@ def execute_serialports(args):
             ser.close()
         else:
             print("Unable to connect to EEPROM writer. Please ensure it is connected")
-        # # This indicates which ports we have already checked
-        # checked = [False] * len(ports)
-        # # First we check the most likely ports. These are the ports that contain the text 'usb' in their description,
-        # device, product or hwid. On Mac, this will check all usb connected ports, which should find the EEPROM writer
-        # # It is unknown how other operating systems will behave
-        # for i in range(len(ports)):
-        #     # Extract the relevant information from the port, making sure to remove any None references
-        #     port = ports[i]
-        #     description = port.description.lower() if port.description is not None else ""
-        #     device = port.device.lower() if port.device is not None else ""
-        #     product = port.product.lower() if port.product is not None else ""
-        #     hwid = port.hwid.lower() if port.hwid is not None else ""
-        #     # Check is usb is in any of these strings. The EEPROM writer is most likely one of these ports, since it
-        #     # must be connected through a usb port
-        #     if 'usb' in description + device + product + hwid:
-        #         # get the serial port, and print it out if it was connected succesfully (i.e. is not None)
-        #         ser = connect_serial(port.device)
-        #         if ser is not None:
-        #             print('Connection established to serial port:')
-        #             print(port.device)
-        #             ser.close()
-        #             return
-        #         # Mark this port as checked
-        #         checked[i] = True
-        #
-        # # If the EEPROM writer wasn't found on those ports, try all the others
-        # for i in range(len(ports)):
-        #     port = ports[i]
-        #     if not checked[i]:
-        #         ser = connect_serial(port.device)
-        #         if ser is not None:
-        #             print('Connection established to serial port:')
-        #             print(port.device)
-        #             ser.close()
-        #             return
-        #
-        # # EEPROM writer was not found
-        # print("Unable to connect to EEPROM writer. Please ensure it is connected")
+
+
+parser = None
 
 
 def main():
+    global parser
     parser = argparse.ArgumentParser(description="Compiler and program loader for unnamed computer")
     subparsers = parser.add_subparsers(help="For more information on using each command, type\n'{} command_name -h'"
                                        .format(parser.prog), dest='command', title='Commands')
@@ -379,7 +245,8 @@ def main():
     port_group = assemble_parser.add_mutually_exclusive_group()
     port_group.add_argument('-a', action='store_true', default=False,
                             help="Automatically selects the serial portthe EEPROM is connected to. "
-                                 "Can only be used if the '-l' is used. Note: this will not work on all systems")
+                                 "Can only be used if the '-l' is used. Note: this may not work on all operating "
+                                 "systems")
     port_group.add_argument('port', nargs='?',
                             help="Name of serial port to load the assembled machine code onto. For a list of available "
                                  "serial ports, type '{} serialports'".format(parser.prog))
@@ -392,6 +259,14 @@ def main():
     read_parser = subparsers.add_parser('read', help='Reads data from a connected EEPROM')
     read_parser.description = 'Reads data from a connected EEPROM and displays the data to the console. ' \
                               'If a file is given, then this data is also saved into the file'
+    port_group = read_parser.add_mutually_exclusive_group()
+    port_group.add_argument('-a', action='store_true', default=False,
+                            help="Automatically selects the serial port the EEPROM is connected to. "
+                                 "Can only be used if the '-l' is used. Note: this may not work on all operating "
+                                 "systems")
+    port_group.add_argument('port', nargs='?',
+                            help="Name of serial port to read from. For a list of available "
+                                 "serial ports, type '{} serialports'".format(parser.prog))
     read_parser.add_argument('bytes', nargs='?', type=int, default=256, choices=range(1, 1 << 15), metavar='bytes',
                              help='Number of bytes to read from the EEPROM. Must be less than 32768. '
                                   'Defaults to 256 if not supplied')
@@ -404,11 +279,14 @@ def main():
     base_group.add_argument('-b', action='store_true', default=False, help='Displays the data read in binary')
 
     load_parser = subparsers.add_parser('load', help='Loads the data in the given file onto a connected EEPROM')
-    load_parser.description = "Loads the given file onto a connected EEPROM. If the '-a' option is not supplied, then" \
-                              "the user will be prompted to select the serial port the EEPROM is connected to"
-    load_parser.add_argument('-a', action='store_true', default=False,
-                             help="Automatically selects the serial port the EEPROM is connected to. "
-                                  "Note: this will not work on all systems")
+    load_parser.description = "Loads the given file onto a connected EEPROM"
+    port_group = load_parser.add_mutually_exclusive_group()
+    port_group.add_argument('-a', action='store_true', default=False,
+                            help="Automatically selects the serial port the EEPROM is connected to. "
+                                 "Note: this may not work on all operating systems")
+    port_group.add_argument('port', nargs='?',
+                            help="Name of serial port to load the file to. For a list of available "
+                                 "serial ports, type '{} serialports'".format(parser.prog))
     load_parser.add_argument('file', type=argparse.FileType('r'),
                              help="File containing the data to load. If the file is a text file (extension: '.txt'), "
                                   "then the ascii characters '0'and '1' are the bits loaded into the file and all other"
