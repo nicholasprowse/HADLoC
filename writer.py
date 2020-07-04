@@ -1,55 +1,51 @@
-import serial.tools.list_ports
-import sys
 import math
 import time
-import os
+
 import utils
 from error import FileError
 
+BOX_CHAR = {'HORIZONTAL': '\u2501', 'VERTICAL': '\u2503', 'CROSS': '\u254B', 'UPPER T': '\u2533'}
+
 
 # TODO Decimal outputs need reformatting
-def display(data, base):
+def display(out, data, base):
     if base == 'bin':
         for address in range(len(data)):
-            print("{:08b}".format(data[address]))
+            out.write('{:08b}\n'.format(data[address]))
     else:
-        for address in range(0, len(data), 16):
-            if address % 512 == 0:
-                print('\u2501' * 5 + ('\u254B' if address > 0 else '\u2533') + '\u2501' * (49 if base == 'hex' else 65) + '\n     \u2503 ', end="")
-                for n in range(16):
-                    if n == 8:
-                        print(" ", end="")
-                    print(("" if base == 'hex' else "_") + "_{:1X} ".format(n), end="")
-                print('\n' + '\u2501' * 5 + '\u254B' + '\u2501' * (49 if base == 'hex' else 65))
-            print("{:03X}_ \u2503 ".format(address // 16), end="")
-            for n in range(min(16, len(data) - address)):
-                if n == 8:
-                    print(" ", end="")
-                if base == 'hex':
-                    print("{:02X} ".format(data[address + n]), end="")
-                else:
-                    print("{:03d} ".format(data[address + n]), end="")
-            print()
+        line_length = 16 if base == 'hex' else 10
+        address_length = 4 if base == 'hex' else 5
+        byte_length = 2 if base == 'hex' else 3
+        page_length = 256 if base == 'hex' else 200
+        address_string = (' {:04X}' if base == 'hex' else ' {:5}') + ' ' + BOX_CHAR['VERTICAL']
+        byte_string = (' {:02X}' if base == 'hex' else ' {:3}')
+
+        header = BOX_CHAR['HORIZONTAL'] * (address_length + 2) + '{}' + \
+            BOX_CHAR['HORIZONTAL'] * (line_length * (byte_length + 1) + 2) + '\n' + \
+            ' ' * (address_length + 2) + BOX_CHAR['VERTICAL']
+
+        for n in range(line_length):
+            if n == line_length / 2:
+                header += ' '
+            header += ' ' + '_' * (byte_length - 1) + '{:1X}'.format(n)
+
+        header += '\n' + BOX_CHAR['HORIZONTAL'] * (address_length + 2) + BOX_CHAR['CROSS'] + \
+            BOX_CHAR['HORIZONTAL'] * (line_length * (byte_length + 1) + 2) + '\n'
+
+        for address in range(0, len(data), line_length):
+            if address % page_length == 0:
+                out.write(header.format(BOX_CHAR['CROSS' if address > 0 else 'UPPER T']))
+            out.write(address_string.format(address))
+            for n in range(min(line_length, len(data) - address)):
+                if n == line_length / 2:
+                    out.write(" ")
+                out.write(byte_string.format(data[address + n]))
+            out.write('\n')
 
 
-def print_help():
-    print("Each command consists of a name, followed by a series of arguments separated by spaces")
-    print("Arguments inside square brackets are optional arguments")
-    print("If an argument is not given, a default value will be used which is shown inside the square brackets")
-    print("Commands:")
-    print("read [bytes=256] [base=hex] [file]")
-    print("\tReads data from the EEPROM and displays the data. The number of bytes read is specified by the 'bytes' "
-          "argument. The results can be printed out in binary, decimal or hexadecimal, "
-          "which is specified by setting the 'base' argument to one of 'bin', 'dec' or 'hex' respectively. "
-          "The full path of a file can be specified in the 'file' argument and the data will be written in the file in "
-          "the same format as it is printed. If no file is provided, the data will not be written to a file.")
-    print("write file")
-    print("\tWrites data to the EEPROM. The 'file' argument is the full path of the file containing the data to write. "
-          "The raw binary data of the file will be written to the EEPROM.")
-    print("quit")
-    print("\tQuits the program")
-    print("help")
-    print("\tDisplays this help message")
+# ANSI escape codes
+CLEAR_LINE = '\x1b[2K'
+PREVIOUS_LINE = '\x1b[F'
 
 
 def write_data(ser, file):
@@ -60,20 +56,19 @@ def write_data(ser, file):
         file = open(file.name, 'rb')
         data = file.read()
         file.close()
-    ser.write(bytes([ord('w'), (len(data) - 1) >> 8, (len(data) - 1) % 256]))
-    progress = 0
-    print("Writing", len(data), "bytes to the EEPROM")
+    size = len(data)
+    ser.write(bytes([ord('w'), (size - 1) >> 8, (size - 1) % 256]))
     start = time.time()
-    for i in range(0, len(data), 64):
-        ser.write(data[i:min(i + 64, len(data))])
+    for i in range(0, size, 64):
+        end_block = min(i + 64, size)
+        ser.write(data[i:end_block])
         ser.read_until()
-        if 100 >= int((i + 64) * 100 / len(data)) > progress + 10:
-            progress = math.floor((i + 64) * 10 / len(data)) * 10
-            rem = (time.time() - start) * len(data) / (i + 64) * (1 - (i + 64) / len(data))
-            "Progress: {:3.1f}%, Estimated Time Remaining: {:4.1f}".format((i + 64) * 100 / len(data), rem)
-            print(
-                "Progress: {:5.1f}%, Estimated Time Remaining: {:5.1f} seconds".format((i + 64) * 100 / len(data), rem))
-    print(ser.read_until().decode(), end="")
+        rem = (time.time() - start) * (size / end_block - 1)
+        print(CLEAR_LINE + "Written {} of {} bytes ({:.1f}%)"
+              .format(end_block, size, end_block * 100 / size))
+        print(CLEAR_LINE + "Estimated Time Remaining: {:.1f} seconds".format(rem) + PREVIOUS_LINE, end='')
+
+    print('\n\n' + ser.read_until().decode(), end="")
 
 
 def read_data_from_txt(file):
@@ -102,10 +97,10 @@ def read_data_from_txt(file):
         elif c == '1':
             bits.append(1)
 
-    data = [0]*math.ceil(len(bits)/8)
+    data = [0] * math.ceil(len(bits) / 8)
     for i in range(len(data)):
-        for bit in range(min(8, len(bits) - 8*i)):
-            data[i] += bits[bit + 8*i] << (7 - bit)
+        for bit in range(min(8, len(bits) - 8 * i)):
+            data[i] += bits[bit + 8 * i] << (7 - bit)
 
     return bytes(data)
 
@@ -113,86 +108,3 @@ def read_data_from_txt(file):
 def read_data(ser, num_bytes):
     ser.write(bytes([ord('r'), (num_bytes - 1) >> 8, (num_bytes - 1) % 256]))
     return list(ser.read(num_bytes))
-
-
-def main():
-    os.chdir("/Users/nicholasprowse/Desktop")
-    stdout = sys.stdout
-    print("Type help for help selecting the serial port")
-    choice = 'refresh'
-    ports = serial.tools.list_ports.comports()
-    while choice == 'refresh':
-        for i in range(len(ports)):
-            print(str(i + 1) + ": " + ports[i].device)
-
-        print("Select the serial port number from the above choices or type 'refresh' to refresh the list")
-
-        choice = input(">> ").lower()
-
-        while not (choice == 'refresh') and not (choice.isdecimal() and 1 <= int(choice) <= len(ports)):
-            if choice == 'quit':
-                sys.exit(0)
-            if choice == 'help':
-                print("Plug the EEPROM Writer into a USB port and select the port it is connected to by typing the "
-                      "number corresponding to the port in the list above"
-                      "\nIf the correct port isn't showing, you can refresh the list by typing 'refresh'"
-                      "\nThe correct port will usually be something like 'dev/usbserial-' followed by a number"
-                      "\nAt any time you can type 'quit' to exit the program")
-            print("Please enter a port number between 1 and", len(ports),
-                  "or type 'refresh' if the required port isn't listed")
-            choice = input('>> ').lower()
-
-        ports = serial.tools.list_ports.comports()
-
-    ser = serial.Serial(ports[int(choice) - 1].device, 115200)
-    print(ser.read_until().decode(), end="")
-    command = [None]
-    while not command[0] == 'quit':
-        command = input('>> ').lower().split(" ")
-        if command[0] == 'read':
-            num_bytes = 256
-            file = None
-            base = 'hex'
-            valid = True
-            if len(command) > 1:
-                if command[1].isdecimal():
-                    num_bytes = int(command[1])
-                else:
-                    print("Argument 1 of 'read' must be a decimal integer")
-                    valid = False
-            if len(command) > 2:
-                if command[2] == 'hex' or command[2] == 'dec' or command[2] == 'bin':
-                    base = command[2]
-                else:
-                    print("Argument 2 of 'read' must be a 'hex', 'dec' or 'bin'")
-                    valid = False
-            if len(command) > 3:
-                file = open(command[3], 'w')
-            if len(command) > 4:
-                print("'read' has a maximum of 3 arguments")
-                valid = False
-            if valid:
-                data = read_data(ser, num_bytes)
-                display(data, base)
-                if file is not None:
-                    sys.stdout = file
-                    display(data, base)
-                    sys.stdout = stdout
-                    file.close()
-                continue
-        elif command[0] == 'write':
-            if len(command) == 2:
-                write_data(ser, command[1])
-                continue
-            print("'write' must have one argument")
-        elif command[0] == 'help':
-            print_help()
-            continue
-        if not command[0] == 'quit':
-            print("Invalid command. Type help for help on the commands")
-
-    ser.close()
-
-
-if __name__ == "__main__":
-    main()

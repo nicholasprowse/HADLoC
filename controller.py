@@ -64,6 +64,7 @@ def connect_serial(device_name):
 
     response = ser.read_until().decode()
     if response == 'Connection acquired\r\n':
+        ser.timeout = None
         return ser
     else:
         return INCORRECT_PORT_ERROR
@@ -72,10 +73,13 @@ def connect_serial(device_name):
 def execute_load(args):
     if args.a:
         ser = find_serialport_auto()
+        if ser is None:
+            print("Unable to connect to EEPROM writer. Please ensure it is connected")
+            return
     elif args.port is not None:
         ser = connect_serial(args.port)
         if ser == INCORRECT_PORT_ERROR:
-            print("No EEPROM writer connected to serial port: {}. Please make sure the EEPROM writer is connected, "
+            print("No EEPROM writer connected to serial port: '{}'. Please make sure the EEPROM writer is connected, "
                   "and you select the correct serial port".format(args.port))
             return
         elif ser == PORT_DOES_NOT_EXIST_ERROR:
@@ -90,10 +94,13 @@ def execute_load(args):
 def execute_read(args):
     if args.a:
         ser = find_serialport_auto()
+        if ser is None:
+            print("Unable to connect to EEPROM writer. Please ensure it is connected")
+            return
     elif args.port is not None:
         ser = connect_serial(args.port)
         if ser == INCORRECT_PORT_ERROR:
-            print("No EEPROM writer connected to serial port: {}. Please make sure the EEPROM writer is connected, "
+            print("No EEPROM writer connected to serial port: '{}'. Please make sure the EEPROM writer is connected, "
                   "and you select the correct serial port".format(args.port))
             return
         elif ser == PORT_DOES_NOT_EXIST_ERROR:
@@ -105,11 +112,9 @@ def execute_read(args):
 
     data = writer.read_data(ser, args.bytes)
     base = 'hex' if args.x else ('dec' if args.d else 'bin')
-    writer.display(data, base)
+    writer.display(sys.stdout, data, base)
     if args.file is not None:
-        sys.stdout = args.file
-        writer.display(data, base)
-        sys.stdout = sys.__stdout__
+        writer.display(args.file, data, base)
         args.file.close()
 
 
@@ -127,8 +132,8 @@ def execute_assemble(args):
         if args.port is not None:
             ser = connect_serial(args.port)
             if ser == INCORRECT_PORT_ERROR:
-                print("No EEPROM writer connected to serial port: {}. Please make sure the EEPROM writer is connected, "
-                      "and you select the correct serial port".format(args.port))
+                print("No EEPROM writer connected to serial port: '{}'. Please make sure the EEPROM writer is "
+                      "connected, and you select the correct serial port".format(args.port))
                 return
             elif ser == PORT_DOES_NOT_EXIST_ERROR:
                 print("The serial port '{}' does not exist. For a list of current serial ports use '{} serialports'"
@@ -264,7 +269,7 @@ def main():
                             help="Automatically selects the serial port the EEPROM is connected to. "
                                  "Can only be used if the '-l' is used. Note: this may not work on all operating "
                                  "systems")
-    port_group.add_argument('port', nargs='?',
+    port_group.add_argument('--port',
                             help="Name of serial port to read from. For a list of available "
                                  "serial ports, type '{} serialports'".format(parser.prog))
     read_parser.add_argument('bytes', nargs='?', type=int, default=256, choices=range(1, 1 << 15), metavar='bytes',
@@ -284,7 +289,7 @@ def main():
     port_group.add_argument('-a', action='store_true', default=False,
                             help="Automatically selects the serial port the EEPROM is connected to. "
                                  "Note: this may not work on all operating systems")
-    port_group.add_argument('port', nargs='?',
+    port_group.add_argument('--port',
                             help="Name of serial port to load the file to. For a list of available "
                                  "serial ports, type '{} serialports'".format(parser.prog))
     load_parser.add_argument('file', type=argparse.FileType('r'),
