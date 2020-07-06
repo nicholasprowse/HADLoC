@@ -79,7 +79,8 @@ class Parser:
         # Check that all labels are defined
         for label in self.used_identifiers:
             if label not in self.labels and label not in self.definitions:
-                raise CompilerException('Label', "The identifier '{}' has not been defined".format(label), label)
+                raise CompilerException(CompilerException.LABEL,
+                                        "The identifier '{}' has not been defined".format(label), label)
 
         self.replace_definitions()
         self.instructions.append(['hlt'])
@@ -161,7 +162,7 @@ class Parser:
                     return
             else:
                 # if there is not a new line, there is an unexpected token
-                raise CompilerException('Syntax', 'Unexpected Token', self.value())
+                raise CompilerException(CompilerException.SYNTAX, 'Unexpected Token', self.value())
 
     def replace_definitions(self):
         """
@@ -170,7 +171,7 @@ class Parser:
         completely made and the definitions all have values in the definitions dictionary. If instructions are added
         the label values are update to reflect this
         """
-        for i in range(len(self.instructions)-1, -1, -1):
+        for i in range(len(self.instructions) - 1, -1, -1):
             instruction = self.instructions[i]
             if (instruction[0] == 'ldu' or instruction[0] == 'ldb') and instruction[1] in self.definitions:
                 # delete the instruction with the identifier and write the instruction with the value of the identifier
@@ -201,7 +202,7 @@ class Parser:
             if self.value() not in self.labels:
                 self.labels[self.value()] = len(self.instructions)
             else:
-                raise CompilerException('Label', 'Duplicate label', self.value())
+                raise CompilerException(CompilerException.LABEL, 'Duplicate label', self.value())
             self.index += 2
             return True
         return False
@@ -220,7 +221,8 @@ class Parser:
             return False
 
         if not self.type(1) == 'identifier':
-            raise CompilerException('Syntax', "Expected identifier after a 'define' keyword", self.value(1))
+            raise CompilerException(CompilerException.ARG,
+                                    "Expected identifier after a 'define' keyword", self.value(1))
 
         if not self.type(2) == 'integer' or not -32768 <= self.value(2) < 65536:
             # if the value is None we use the previous token and shift it right so the pointer points to the empty
@@ -229,8 +231,9 @@ class Parser:
             if error_token is None:
                 error_token = self.value(1)
                 error_token.pos += len(error_token) + 1
-            raise CompilerException('Syntax', "Expected integer in the range -32768 to 65535 (inclusive) for "
-                                              "argument to 'define' instruction", error_token)
+            error_type = CompilerException.VALUE if self.type(2) == 'integer' else CompilerException.ARG
+            raise CompilerException(error_type, "Expected integer in the range -32768 to 65535 (inclusive) for "
+                                                "argument to 'define' instruction", error_token)
 
         self.definitions[self.value(1)] = self.value(2)
         self.index += 3
@@ -267,7 +270,7 @@ class Parser:
                     else:
                         errtoken = self.value(i)
                         errtoken.pos += 2
-                    raise CompilerException('Argument', "Expected {0} for argument {1} in '{2}' instruction"
+                    raise CompilerException(CompilerException.ARG, "Expected {0} for argument {1} in '{2}' instruction"
                                             .format(arguments[i], i + 1, self.value()), errtoken)
 
                 instruction.append(self.value(i + 1))
@@ -355,8 +358,9 @@ class Parser:
         if tokentype == 'integer':
             # ldb arguments must fit in 16 bits
             if not -32768 <= value < 65536:
-                raise CompilerException('Value', "Expected integer in the range -32768 to 65535 (inclusive) for "
-                                                 "argument to '{}' instruction".format(instr), value)
+                raise CompilerException(CompilerException.VALUE,
+                                        "Expected integer in the range -32768 to 65535 (inclusive) "
+                                        "for argument to '{}' instruction".format(instr), value)
 
             # If the integer is in a position object, we need to extract it. This is fine because there are no longer
             # any errors that can occur with this instruction. We need to support both integers and PositionObjects,
@@ -388,8 +392,8 @@ class Parser:
         else:
             errtoken = self.value(-1)
             errtoken.pos += 4
-        raise CompilerException('Value', "Expected integer or label for argument to '{}' instruction".format(instr),
-                                errtoken)
+        raise CompilerException(CompilerException.ARG, "Expected integer or label for argument to '{}' instruction"
+                                .format(instr), errtoken)
 
     def write_lda(self):
         """

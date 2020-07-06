@@ -55,7 +55,7 @@ class Tokenizer:
 
             if not (self.tokenize_int() or self.tokenize_keyword_identifier_register() or self.tokenize_label()
                     or self.newline()):
-                raise CompilerException('Syntax', 'Unexpected character', self.code[0])
+                raise CompilerException(CompilerException.SYNTAX, 'Unexpected character', self.code[0])
 
     def addtoken(self, tokentype, value):
         """
@@ -153,7 +153,7 @@ class Tokenizer:
             return True
 
         if not pos:
-            raise CompilerException("Syntax", "Unexpected character", self.code[-1])
+            raise CompilerException(CompilerException.SYNTAX, "Unexpected character", self.code[-1])
         else:
             return False
 
@@ -183,7 +183,7 @@ class Tokenizer:
         elif self.code.match('1'):
             n = 1
         else:
-            raise CompilerException("Syntax", "Invalid binary literal", self.code[-2])
+            raise CompilerException(CompilerException.SYNTAX, "Invalid binary literal", self.code[0])
 
         while True:
             if self.code.match('0'):
@@ -272,7 +272,7 @@ class Tokenizer:
             n = int(self.code[0])
             self.code.advance()
         except ValueError:
-            raise CompilerException("Syntax", "Invalid hex literal", self.code[-2])
+            raise CompilerException(CompilerException.SYNTAX, "Invalid hex literal", self.code[0])
 
         while True:
             try:
@@ -307,17 +307,17 @@ class Tokenizer:
             return False
 
         if self.code[1] != "'":
-            raise CompilerException("Syntax", "Invalid character literal",
+            raise CompilerException(CompilerException.SYNTAX, "Invalid character literal",
                                     self.code[0] if self.code[0] == "'" else self.code[-1])
 
         c = self.code[0].chars[0].value
         self.code.advance(2)
         if 32 <= ord(c) <= 126:
             if not pos:
-                raise CompilerException("Syntax", "Unexpected character", self.code[-4])
+                raise CompilerException(CompilerException.SYNTAX, "Unexpected character", self.code[-4])
             return self.addtoken('integer', PositionObject(ord(c), self.code[-2].line, self.code[-2].pos))
         else:
-            raise CompilerException("Syntax", "Invalid character literal", self.code[-2])
+            raise CompilerException(CompilerException.SYNTAX, "Invalid character literal", self.code[-2])
 
 
 def tokenize(file):
@@ -348,18 +348,3 @@ def tokenize(file):
     error.code = code.splitlines()
     CompilerException.file_name = os.path.realpath(file.name)
     return Tokenizer(code).tokens
-
-
-def main():
-    f = open("/Users/nicholasprowse/Desktop/mult.asm")
-    try:
-        tokens = tokenize(f)
-        for i in tokens:
-            print(i)
-    except CompilerException as cs:
-        cs.display()
-    f.close()
-
-
-if __name__ == '__main__':
-    main()

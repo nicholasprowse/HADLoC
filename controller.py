@@ -9,7 +9,7 @@ from serial import SerialException
 import serial
 
 from assembler.assembler import assemble
-from error import NonTerminatingException
+from error import HADLOCException, printerror
 
 
 def get_serial():
@@ -27,7 +27,7 @@ def get_serial():
 
         while not (choice == 'refresh') and not (choice.isdecimal() and 1 <= int(choice) <= len(ports)):
             if choice == 'quit':
-                sys.exit(0)
+                raise SystemExit
             if choice == 'help':
                 print("Plug the EEPROM Writer into a USB port and select the port it is connected to by typing the "
                       "number corresponding to the port in the list above"
@@ -44,7 +44,8 @@ def get_serial():
     if len(response) is not 0:
         print(response, end="")
     else:
-        raise IOError("Could not establish connection with the port '{}'".format(ports[int(choice) - 1].device))
+        raise HADLOCException(HADLOCException.SERIAL,
+                              f"Could not establish connection with the port '{ports[int(choice) - 1].device}'")
     return ser
 
 
@@ -70,47 +71,47 @@ def connect_serial(device_name):
         return INCORRECT_PORT_ERROR
 
 
-def execute_load(args):
+def get_serial_from_args(args):
+    """
+    Gets the serial port gives an argparse args object. The args object must have the following 2 arguments
+        a: Boolean value indicating if the serial port should be found automatically
+        port: String containing the name of the serial port. Can be None
+    If a is False and port is None, then the user is prompted to select a serial port using the get_serial() function
+    Args:
+        args: argparse args object with boolean value a and string value port (port can be None
+
+    Returns:
+        The serial port that has been selected
+
+    Raises:
+        HADLOCException: If the given method of selecting the serial port was unsuccessful
+    """
     if args.a:
         ser = find_serialport_auto()
         if ser is None:
-            print("Unable to connect to EEPROM writer. Please ensure it is connected")
-            return
-    elif args.port is not None:
+            raise HADLOCException(HADLOCException.SERIAL,
+                                  'Unable to connect to EEPROM writer. Please ensure it is connected')
+        return ser
+    if args.port is not None:
         ser = connect_serial(args.port)
         if ser == INCORRECT_PORT_ERROR:
-            print("No EEPROM writer connected to serial port: '{}'. Please make sure the EEPROM writer is connected, "
-                  "and you select the correct serial port".format(args.port))
-            return
+            raise HADLOCException(HADLOCException.SERIAL,
+                                  "No EEPROM writer connected to serial port: '{}'. Please make sure the EEPROM "
+                                  "writer is connected, and you select the correct serial port".format(args.port))
         elif ser == PORT_DOES_NOT_EXIST_ERROR:
-            print("The serial port '{}' does not exist. For a list of current serial ports use '{} serialports'"
-                  .format(args.port, parser.prog))
-            return
-    else:
-        ser = get_serial()
-    writer.write_data(ser, args.file)
+            raise HADLOCException(HADLOCException.SERIAL,
+                                  "The serial port '{}' does not exist. For a list of current "
+                                  "serial ports use '{} serialports'".format(args.port, parser.prog))
+        return ser
+    return get_serial()
+
+
+def execute_load(args):
+    writer.write_data(get_serial_from_args(args), args.file)
 
 
 def execute_read(args):
-    if args.a:
-        ser = find_serialport_auto()
-        if ser is None:
-            print("Unable to connect to EEPROM writer. Please ensure it is connected")
-            return
-    elif args.port is not None:
-        ser = connect_serial(args.port)
-        if ser == INCORRECT_PORT_ERROR:
-            print("No EEPROM writer connected to serial port: '{}'. Please make sure the EEPROM writer is connected, "
-                  "and you select the correct serial port".format(args.port))
-            return
-        elif ser == PORT_DOES_NOT_EXIST_ERROR:
-            print("The serial port '{}' does not exist. For a list of current serial ports use '{} serialports'"
-                  .format(args.port, parser.prog))
-            return
-    else:
-        ser = get_serial()
-
-    data = writer.read_data(ser, args.bytes)
+    data = writer.read_data(get_serial_from_args(args), args.bytes)
     base = 'hex' if args.x else ('dec' if args.d else 'bin')
     writer.display(sys.stdout, data, base)
     if args.file is not None:
@@ -119,36 +120,13 @@ def execute_read(args):
 
 
 def execute_assemble(args):
-    try:
-        files = assemble(args.file)
-        print('Successfully Assembled')
-    except NonTerminatingException as exception:
-        exception.display()
-        return
+    files = assemble(args.file)
+    print('Successfully Assembled')
     if args.c:
         for i in range(1, len(files)):
             os.remove(files[i])
     if args.l:
-        if args.port is not None:
-            ser = connect_serial(args.port)
-            if ser == INCORRECT_PORT_ERROR:
-                print("No EEPROM writer connected to serial port: '{}'. Please make sure the EEPROM writer is "
-                      "connected, and you select the correct serial port".format(args.port))
-                return
-            elif ser == PORT_DOES_NOT_EXIST_ERROR:
-                print("The serial port '{}' does not exist. For a list of current serial ports use '{} serialports'"
-                      .format(args.port, parser.prog))
-                return
-            else:
-                writer.write_data(ser, open(files[0], 'r'))
-        elif args.a:
-            ser = find_serialport_auto()
-            if ser is None:
-                print("Unable to connect to EEPROM writer. Please ensure it is connected")
-            else:
-                writer.write_data(ser, open(files[0], 'r'))
-        else:
-            writer.write_data(get_serial(), open(files[0], 'r'))
+        writer.write_data(get_serial_from_args(args), open(files[0], 'r'))
 
 
 def find_serialport_auto():
@@ -223,7 +201,8 @@ def execute_serialports(args):
             print(ser.port)
             ser.close()
         else:
-            print("Unable to connect to EEPROM writer. Please ensure it is connected")
+            raise HADLOCException(HADLOCException.SERIAL, 'Unable to connect to EEPROM writer. '
+                                                          'Please ensure it is connected')
 
 
 parser = None
@@ -319,7 +298,10 @@ def main():
         parser.print_help()
         parser.exit()
     else:
-        args.func(args)
+        try:
+            args.func(args)
+        except HADLOCException as exception:
+            exception.display()
 
 
 if __name__ == "__main__":

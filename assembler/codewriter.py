@@ -95,12 +95,12 @@ def instruction_value(instruction):
     if command == 'mov':
         src, dst = instruction[1], instruction[2]
         if dst == 'I':
-            raise CompilerException('Argument', "Cannot move into the 'I' register. The 'I' register is read only",
-                                    instruction[2])
+            raise CompilerException(CompilerException.ARG,
+                                    "Cannot move into the 'I' register. The 'I' register is read only", instruction[2])
 
         if src == 'H':
-            raise CompilerException('Argument', "Cannot move out of the 'H' register. The 'H' register write only",
-                                    instruction[1])
+            raise CompilerException(CompilerException.ARG,
+                                    "Cannot move out of the 'H' register. The 'H' register write only", instruction[1])
 
         s = 0
         if dst == 'M':
@@ -116,8 +116,9 @@ def instruction_value(instruction):
 
     if command in ['opd', 'opi']:
         if instruction[1] in ['Y' or 'H']:
-            raise CompilerException('Argument', "The '{}' register cannot be used as the argument to the '{}' "
-                                                "instruction".format(instruction[1], command), instruction[1])
+            raise CompilerException(CompilerException.ARG,
+                                    "The '{}' register cannot be used as the argument to the '{}' instruction"
+                                    .format(instruction[1], command), instruction[1])
         d = 1 if command == 'opd' else 0
         return 0x08 | d << 2 | registers[instruction[1]]
 
@@ -125,9 +126,10 @@ def instruction_value(instruction):
     if arithmetic is not None:
         return arithmetic
 
-    # In theory this is never reached, as all invalid instructions should have been caught in the tokenizing or
-    # parsing stage
-    raise CompilerException("Encoding", 'Instruction not encoded: ' + str(instruction), instruction[0])
+    # In theory this is never reached, as all invalid instructions should have been caught in the tokenizing,
+    # parsing and codewriting stage
+    raise BaseException("This instruction {} was not able to be encoded, and no error could be found in it. Please"
+                        " update the assembler to handle this instruction".format(instruction))
 
 
 def arithmetic_value(instruction):
@@ -148,12 +150,12 @@ def arithmetic_value(instruction):
 
     dst, arg1 = instruction[1], instruction[2]
     if dst not in ['X', 'L']:
-        raise CompilerException('Argument', "The destination register of arithmetic and logic instructions must be "
-                                            "'X' or 'L'", dst)
+        raise CompilerException(CompilerException.ARG, "The destination register of arithmetic and logic instructions "
+                                                       "must be 'X' or 'L'", dst)
 
     if arg1 in ['I', 'Y', 'H']:
-        raise CompilerException('Argument', "The '{}' register cannot be used as an argument for the arithmetic and"
-                                            "logic instructions".format(arg1), arg1)
+        raise CompilerException(CompilerException.ARG, "The '{}' register cannot be used as an argument for the "
+                                                       "arithmetic and logic instructions".format(arg1), arg1)
 
     x = 1 if dst == 'X' else 0
     m = 1 if arg1 == 'M' else 0
@@ -163,17 +165,18 @@ def arithmetic_value(instruction):
 
     arg2 = instruction[3]
     if arg2 in ['I', 'Y', 'H']:
-        raise CompilerException('Argument', "The '{}' register cannot be used as an argument for the arithmetic and"
-                                            "logic instructions".format(arg2), arg2)
+        raise CompilerException(CompilerException.ARG, "The '{}' register cannot be used as an argument for the "
+                                                       "arithmetic and logic instructions".format(arg2), arg2)
     if arg2 == 'M':
         m = 1
 
     if arg1 == arg2 == 'X':
-        raise CompilerException('Argument', "'X' cannot be both arguments in arithmetic and logic instructions", arg2)
+        raise CompilerException(CompilerException.ARG,
+                                "'X' cannot be both arguments in arithmetic and logic instructions", arg2)
 
     if arg1 != 'X' and arg2 != 'X':
-        raise CompilerException('Argument', "Arithmetic and logic instructions must have at least one argument be 'X'",
-                                arg1)
+        raise CompilerException(CompilerException.ARG,
+                                "Arithmetic and logic instructions must have at least one argument be 'X'", arg1)
 
     if instruction[0] == 'sub':
         opcode = 0xD if arg1 == 'X' else 0x5

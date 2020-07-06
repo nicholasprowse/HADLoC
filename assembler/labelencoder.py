@@ -75,7 +75,7 @@ def encode_labels(parser):
     _, finished = find_lengths(labels, finished, instructions)
 
     if len(finished) < len(labels):
-        raise CompilerException('Label', 'Not able to resolve label locations', 0)
+        raise CompilerException(CompilerException.LABEL, 'Not able to resolve label locations', 0)
     else:
         for i in range(len(instructions)-1, -1, -1):
             instruction = instructions[i]

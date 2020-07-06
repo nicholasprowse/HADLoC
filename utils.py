@@ -1,4 +1,5 @@
 from error import FileError
+from _io import TextIOWrapper
 
 
 def extension(file_name):
@@ -12,6 +13,20 @@ def extension(file_name):
         (str) the extension of the file
     """
     return file_name[len(file_name) - file_name[::-1].find('.'):].lower()
+
+
+def file_name(file):
+    """
+    Returns the name of a given file. This is just the name, not including the path. The file argument can either be a
+    file object or a string representing the path to the file
+    Args:
+        file: The file to get the name of. Either a file object or a string of the path to the file
+    Returns:
+        The name of the file
+    """
+    if type(file) == TextIOWrapper:
+        file = file.name
+    return file[len(file) - file[::-1].find('/'):].lower()
 
 
 def verify_file(file, ext, ext_error):

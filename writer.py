@@ -7,7 +7,6 @@ from error import FileError
 BOX_CHAR = {'HORIZONTAL': '\u2501', 'VERTICAL': '\u2503', 'CROSS': '\u254B', 'UPPER T': '\u2533'}
 
 
-# TODO Decimal outputs need reformatting
 def display(out, data, base):
     if base == 'bin':
         for address in range(len(data)):
