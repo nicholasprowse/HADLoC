@@ -11,7 +11,9 @@ def assemble(file):
     file_name = verify_file(file, 'hdc', "File must have '.hdc' extension")
     tokens = tokenize(file)
     file.close()
-    parser = Parser(tokens)
+    warnings = []
+    parser = Parser(tokens, warnings)
+    warnings = ["Warning: " + warning for warning in warnings]
     encode_labels(parser)
     files = write_code(parser.instructions, file_name)
-    return files
+    return warnings, files

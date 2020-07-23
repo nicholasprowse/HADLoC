@@ -9,6 +9,8 @@ keywords = ['lda', 'ldb', 'ldu', 'mov', 'jmp', 'jlt', 'jeq', 'jgt', 'jle', 'jge'
 
 registers = ['L', 'H', 'M', 'I', 'X', 'Y']
 
+symbols = [':', '+', '-', '&', '|', '!', '(', ')']
+
 
 class Tokenizer:
     """
@@ -53,7 +55,7 @@ class Tokenizer:
         while self.code.hasmore():
             self.code.skip_whitespace()
 
-            if not (self.tokenize_int() or self.tokenize_keyword_identifier_register() or self.tokenize_label()
+            if not (self.tokenize_int() or self.tokenize_keyword_identifier_register() or self.tokenize_symbol()
                     or self.newline()):
                 raise CompilerException(CompilerException.SYNTAX, 'Unexpected character', self.code[0])
 
@@ -72,17 +74,6 @@ class Tokenizer:
         """
         self.tokens[-1].append((tokentype, value))
         return True
-
-    def tokenize_label(self):
-        """
-        Tokenizes a label. A label is simply any instance of a colon, ':'
-        The value of a label is a String object containing the colon that created the label
-
-        Returns:
-            (bool): True, if a label token was created, False otherwise.
-        """
-        if self.code.match(':'):
-            return self.addtoken('label', ':')
 
     def tokenize_keyword_identifier_register(self):
         """
@@ -135,38 +126,40 @@ class Tokenizer:
             return True
         return False
 
+    def tokenize_symbol(self):
+        """
+        Tokenizes a symbol. There are five symbols: '+', '-', '&', '|', '!', '(', ')' and ':'
+        The value of an operator is a String object containing the symbol
+
+        Returns:
+            bool: True if an operator was tokenized, False otherwise
+        """
+        for symbol in symbols:
+            if self.code.match(symbol):
+                return self.addtoken('symbol', self.code[-1])
+        return False
+
     def tokenize_int(self):
         """
         Tokenizes an integer. There are 5 types of integer: binary, octal, decimal, hexadecimal and characters.
-        All types of integer except characters can have a negative sign, '-', before them, and the value will be the
-        2's complement value.
-        Character integers evaluate to the ASCII value of the character.
-        The value of an integer token is a PositionObject whose value attribute is the integer represented by the token.
+        This only tokenizes the integer (not the sign). If there is a minus sign, it will be tokenized as a symbol, and
+        the parser will compute the negative of this value. Character integers evaluate to the ASCII value of the
+        character. The value of an integer token is a PositionObject whose value attribute is the integer represented
+        by the token.
 
         Returns:
             (bool): True if an integer was tokenized, False otherwise
         """
-        pos = not self.code.match('-')
-
-        if self.tokenize_bin(pos) or self.tokenize_hex(pos) or self.tokenize_oct(pos) \
-                or self.tokenize_dec(pos) or self.tokenize_char(pos):
+        if self.tokenize_bin() or self.tokenize_hex() or self.tokenize_oct() \
+                or self.tokenize_dec() or self.tokenize_char():
             return True
 
-        if not pos:
-            raise CompilerException(CompilerException.SYNTAX, "Unexpected character", self.code[-1])
-        else:
-            return False
+        return False
 
-    def tokenize_bin(self, pos):
+    def tokenize_bin(self):
         """
-        Tokenizes a binary integer. Will not tokenize the negative sign before it, so if there is a negative sign, this
-        must already be advanced past. The pos argument is a boolean value indicating if this should be tokenized as a
-        positive integer or a negative integer.
+        Tokenizes a binary integer.
         A binary integer must start with '0b' or '0B' and is followed by one or more '0's or '1's
-
-        Args:
-            pos (bool): A boolean value indicating if this integer is positive or not. True means it is positive,
-            False means its negative
 
         Returns:
             (bool): True if a binary integer was tokenized, False otherwise
@@ -191,18 +184,12 @@ class Tokenizer:
             elif self.code.match('1'):
                 n = 2 * n + 1
             else:
-                return self.addtoken('integer', PositionObject(n if pos else -n, first.line, first.pos))
+                return self.addtoken('integer', PositionObject(n, first.line, first.pos))
 
-    def tokenize_oct(self, pos):
+    def tokenize_oct(self):
         """
-        Tokenizes an octal integer. Will not tokenize the negative sign before it, so if there is a negative sign, this
-        must already be advanced past. The pos argument is a boolean value indicating if this should be tokenized as a
-        positive integer or a negative integer.
+        Tokenizes an octal integer.
         An octal integer must start with '0' and then is followed by zero or more characters between '0' and '7'
-
-        Args:
-            pos (bool): A boolean value indicating if this integer is positive or not. True means it is positive,
-            False means its negative
 
         Returns:
             (bool): True if an octal integer was tokenized, False otherwise
@@ -217,18 +204,12 @@ class Tokenizer:
             if char is not None:
                 n = 8 * n + int(char)
             else:
-                return self.addtoken('integer', PositionObject(n if pos else -n, first.line, first.pos))
+                return self.addtoken('integer', PositionObject(n, first.line, first.pos))
 
-    def tokenize_dec(self, pos):
+    def tokenize_dec(self):
         """
-        Tokenizes a decimal integer. Will not tokenize the negative sign before it, so if there is a negative sign, this
-        must already be advanced past. The pos argument is a boolean value indicating if this should be tokenized as a
-        positive integer or a negative integer.
+        Tokenizes a decimal integer.
         A decimal integer is a sequence of one or more characters between '0' and '9'
-
-        Args:
-            pos (bool): A boolean value indicating if this integer is positive or not. True means it is positive,
-            False means its negative
 
         Returns:
             (bool): True if a decimal integer was tokenized, False otherwise
@@ -244,19 +225,13 @@ class Tokenizer:
             if char is not None:
                 n = 10 * n + int(char)
             else:
-                return self.addtoken('integer', PositionObject(n if pos else -n, first.line, first.pos))
+                return self.addtoken('integer', PositionObject(n, first.line, first.pos))
 
-    def tokenize_hex(self, pos):
+    def tokenize_hex(self):
         """
-        Tokenizes a hexadecimal integer. Will not tokenize the negative sign before it, so if there is a negative sign,
-        this must already be advanced past. The pos argument is a boolean value indicating if this should be tokenized
-        as a positive integer or a negative integer.
+        Tokenizes a hexadecimal integer.
         A hexadecimal integer starts with '0x' or '0X' and then is followed by a sequence of one or more hexadecimal
         integers. A hexadecimal integer is any character between ('0' and '9'), ('a' and 'f') or ('A' and 'F')
-
-        Args:
-            pos (bool): A boolean value indicating if this integer is positive or not. True means it is positive,
-            False means its negative
 
         Returns:
             (bool): True if a hexadecimal integer was tokenized, False otherwise
@@ -279,19 +254,13 @@ class Tokenizer:
                 n = 16 * n + int(self.code[0])
                 self.code.advance()
             except ValueError:
-                return self.addtoken('integer', PositionObject(n if pos else -n, first.line, first.pos))
+                return self.addtoken('integer', PositionObject(n, first.line, first.pos))
 
-    def tokenize_char(self, pos):
+    def tokenize_char(self):
         """
-        Tokenizes a character integer. The pos parameter indicates if a negative sign (-) was before this token. Since
-        character integers cannot be negative, if tokenization succeeds and pos is False, a CompilerException will be
-        raised.
+        Tokenizes a character integer.
         A character integer is a character with an ASCII value between 32 (space) and 126 (~) (inclusive), with a single
         quotation mark before and after it (').
-
-        Args:
-            pos (bool): A boolean value indicating if there was a negative sign (-) directly before this token.
-            True, indicates there was no negative sign, and False indicates there was a negative sign
 
         Returns:
             (bool): True if a character integer was tokenized, False otherwise
@@ -301,7 +270,6 @@ class Tokenizer:
                 - If there is a single quotation mark at the start, but there is no closing quotation mark
                     in the correct place (i.e. with one character between the 2 quotation marks)
                 - If the character inside the quotation marks is outside of the ASCII range 32 to 126 (inclusive)
-                - If tokenization succeeds and pos is False
         """
         if not self.code.match("'"):
             return False
@@ -313,8 +281,6 @@ class Tokenizer:
         c = self.code[0].chars[0].value
         self.code.advance(2)
         if 32 <= ord(c) <= 126:
-            if not pos:
-                raise CompilerException(CompilerException.SYNTAX, "Unexpected character", self.code[-4])
             return self.addtoken('integer', PositionObject(ord(c), self.code[-2].line, self.code[-2].pos))
         else:
             raise CompilerException(CompilerException.SYNTAX, "Invalid character literal", self.code[-2])

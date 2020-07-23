@@ -65,9 +65,9 @@ def write_data(ser, file):
         rem = (time.time() - start) * (size / end_block - 1)
         print(CLEAR_LINE + "Written {} of {} bytes ({:.1f}%)"
               .format(end_block, size, end_block * 100 / size))
-        print(CLEAR_LINE + "Estimated Time Remaining: {:.1f} seconds".format(rem) + PREVIOUS_LINE, end='')
-
-    print('\n\n' + ser.read_until().decode(), end="")
+        print(CLEAR_LINE + "Estimated Time Remaining: {:.1f} seconds".format(rem) + PREVIOUS_LINE, end='', flush=True)
+    print("\n")
+    ser.read_until().decode()
 
 
 def read_data_from_txt(file):

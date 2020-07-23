@@ -141,9 +141,9 @@ class Code:
             Traditional comments start with '/*' and end at the first instance of '*/'.
             Traditional comments can span over multiple lines
         """
-        for i in range(len(self.string) - 2, -1, -1):
-            # Remove EOL comments
-            if self.string.substring(i, i + 2) == '//':
+        i = 0
+        while i < len(self.string) - 1:
+            while self.string.substring(i, i + 2) == '//':
                 for j in range(i + 2, len(self.string) + 1):
                     if j == len(self.string):
                         del self.string[i:j]
@@ -154,13 +154,37 @@ class Code:
                         break
 
             # Remove Traditional comments
-            if self.string.substring(i, i + 2) == '/*':
+            while self.string.substring(i, i + 2) == '/*':
                 for j in range(i + 2, len(self.string) + 1):
                     if j == len(self.string):
-                        raise CompilerException('Syntax', 'Comment not closed', self.string[i])
+                        raise CompilerException(CompilerException.SYNTAX, 'Comment not closed',
+                                                self.string[i])
                     if self.string.substring(j, j + 2) == '*/':
                         del self.string[i:j + 2]
                         break
+
+            i += 1
+
+        # for i in range(len(self.string) - 2, -1, -1):
+        #     # Remove EOL comments
+        #     if self.string.substring(i, i + 2) == '//':
+        #         for j in range(i + 2, len(self.string) + 1):
+        #             if j == len(self.string):
+        #                 del self.string[i:j]
+        #                 break
+        #
+        #             if self.string[j].line != self.string[i].line:
+        #                 del self.string[i:j]
+        #                 break
+        #
+        #     # Remove Traditional comments
+        #     if self.string.substring(i, i + 2) == '/*':
+        #         for j in range(i + 2, len(self.string) + 1):
+        #             if j == len(self.string):
+        #                 raise CompilerException(CompilerException.SYNTAX, 'Comment not closed', self.string[i])
+        #             if self.string.substring(j, j + 2) == '*/':
+        #                 del self.string[i:j + 2]
+        #                 break
 
     def stripwhitespace(self):
         """
@@ -357,12 +381,12 @@ class PositionObject:
     Note: Line numbers start at one, while pos starts at 0
 
     Args:
-        value (object): The object to store
+        value (any): The object to store
         line (int): the line number that the object was originally derived from
         pos (int): the position on the line the object was originally derived from
 
     Attributes:
-        value (object): The object to store
+        value (any): The object to store
         line (int): the line number that the object was originally derived from
         pos (int): the position on the line the object was originally derived from
     """
@@ -377,7 +401,7 @@ class PositionObject:
         Tests if this object is equal to the other. When checking for equality, only the value attribute is checked.
 
         Args:
-            other (obj): The other object to test equality
+            other: The other object to test equality
 
         Returns:
             True if the value attribute equals the other object, otherwise False
@@ -391,7 +415,7 @@ class PositionObject:
         Tests if this object is less than the other. Only the value attribute is relevant.
 
         Args:
-            other (obj): The other object to test equality
+            other: The other object to test equality
 
         Returns:
             True if the value attribute is less than the other object, otherwise False
@@ -405,7 +429,7 @@ class PositionObject:
         Tests if this object is greater than to the other. Only the value attribute is relevant.
 
         Args:
-            other (obj): The other object to test equality
+            other: The other object to test equality
 
         Returns:
             True if the value attribute is greater than the other object, otherwise False
@@ -419,7 +443,7 @@ class PositionObject:
         Tests if this object is less than or equal to the other. Only the value attribute is relevant.
 
         Args:
-            other (obj): The other object to test equality
+            other: The other object to test equality
 
         Returns:
             True if the value attribute is less than the other object, otherwise False
@@ -433,7 +457,7 @@ class PositionObject:
         Tests if this object is greater than or equal to the other. Only the char attribute is relevant.
 
         Args:
-            other (obj): The other object to test equality
+            other: The other object to test equality
 
         Returns:
             True if the value attribute is greater than the other object, otherwise False
@@ -447,7 +471,7 @@ class PositionObject:
         Tests if this object is not equal to the other. Only the char attribute is relevant.
 
         Args:
-            other (obj): The other object to test equality
+            other: The other object to test equality
 
         Returns:
             True if the value attribute is not equal to the other object, otherwise False
@@ -455,6 +479,86 @@ class PositionObject:
         if type(other) == PositionObject:
             return self.value != other.value
         return self.value != other
+
+    def __iand__(self, other):
+        """
+        Inplace and for PositionObjects. Ands together the two value properties,
+        and keeps location of first PositionObject
+        """
+        if type(other) == PositionObject:
+            self.value &= other.value
+        self.value &= other
+
+    def __and__(self, other):
+        """
+        Bitwise and for PositionObjects. Ands together the two value properties,
+        and keeps location of first PositionObject
+        """
+        if type(other) == PositionObject:
+            return PositionObject(self.value & other.value, self.line, self.pos)
+        return PositionObject(self.value & other, self.line, self.pos)
+
+    def __ior__(self, other):
+        """
+        Inplace or for PositionObjects. Ors together the two value properties,
+        and keeps location of first PositionObject
+        """
+        if type(other) == PositionObject:
+            self.value |= other.value
+        self.value |= other
+
+    def __or__(self, other):
+        """
+        Bitwise or for PositionObjects. Ors together the two value properties,
+        and keeps location of first PositionObject
+        """
+        if type(other) == PositionObject:
+            return PositionObject(self.value | other.value, self.line, self.pos)
+        return PositionObject(self.value | other, self.line, self.pos)
+
+    def __iadd__(self, other):
+        """
+        Inplace addition for PositionObjects. Ors together the two value properties,
+        and keeps location of first PositionObject
+        """
+        if type(other) == PositionObject:
+            self.value += other.value
+        self.value += other
+
+    def __add__(self, other):
+        """
+        Addition for PositionObjects. Adds together the two value properties,
+        and keeps location of first PositionObject
+        """
+        if type(other) == PositionObject:
+            return PositionObject(self.value + other.value, self.line, self.pos)
+        return PositionObject(self.value + other, self.line, self.pos)
+
+    def __isub__(self, other):
+        """
+        Inplace subtraction for PositionObjects. Subtracts the two value properties,
+        and keeps location of first PositionObject
+        """
+        if type(other) == PositionObject:
+            self.value -= other.value
+        self.value -= other
+
+    def __sub__(self, other):
+        """
+        Subtraction for PositionObjects. Subtracts the two value properties,
+        and keeps location of first PositionObject
+        """
+        if type(other) == PositionObject:
+            return PositionObject(self.value - other.value, self.line, self.pos)
+        return PositionObject(self.value - other, self.line, self.pos)
+
+    def __invert__(self):
+        """Returns the bitwise inverse of the value of this PositionObject, as a PositionObject"""
+        return PositionObject(~self.value, self.line, self.pos)
+
+    def __neg__(self):
+        """Returns the negative of the value of this PositionObject, as a PositionObject"""
+        return PositionObject(-self.value, self.line, self.pos)
 
     def __str__(self):
         return "(" + repr(self.value) + ", line=" + str(self.line) + ", pos=" + str(self.pos) + ')'

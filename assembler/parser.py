@@ -16,7 +16,7 @@ class Parser:
     The parser will convert the lda and ldb pseudoinstructions into the corresponding assembly instructions.
     However, if a label is used as an argument for a load instruction, it will be left as a label, as the values of
     the labels need to be determined in the labelencoder. Thus, after parsing some of the load instructions are still
-    pseudoinstructions. Again, this will be resolved in the label encoder.
+    pseudoinstructions. Again, this will be resolved in the labelencoder.
 
     The parser will also create a dictionary of all the labels and constants present in the code. The dictionary uses
     the label as a key, and the line number as the value. Note that this line number is not final, becuase as described
@@ -39,6 +39,9 @@ class Parser:
         tokens (list<list<tuple>>): A two dimensional list containing the tokens on each line of the assembly file.
             Each token is stored in a tuple containing the type of the token as a string, and the value of the token
             as a String object or a PositionObject. This should be created using tokenizer.tokenize(text)
+        warnings (list<String>): A list of warnings to display when compilation is completed. If the parser finds any
+            warnings, it adds a message to this list, and it will be displayed by the assembler when assembly is
+            completed
 
     Attributes:
         tokens (list<list<tuple>>): Stores the tokens passed in as an argument
@@ -51,10 +54,9 @@ class Parser:
             the definitions as the value. Unlike the labels dictionary, these values are final.
         instructions (list<list>): List of lists, where each list represents one instruction. Each instruction contains
             the strings and integer values required to represent the instruction.
-        used_identifiers (list<String>): List of the identifiers (labels or definitions) used in the code.
-            These are the identifiers that are used in load instructions, NOT the identifiers that are defined in
-            definitions or labels. If there is an identifier in this list, that is not in the labels or definitiions
-            dictionaries, then there is a CompilerException, an undefined label was used.
+        used_labels (list<String>): List of the labels used in the code. These are the labels that are used in load
+            instructions, NOT the labels that are created. If there is an label in this list, that is not in the
+            labels dictionary, then there is a CompilerException, an undefined label was used.
 
     Raises:
         CompilerException:
@@ -65,24 +67,33 @@ class Parser:
             - If any unexpected tokens are encountered
     """
 
-    def __init__(self, tokens):
+    def __init__(self, tokens, warnings):
         self.tokens = tokens
         self.line = 0
         self.index = 0
         self.labels = {}
         self.definitions = {}
         self.instructions = [['nop'], ['nop']]
-        self.used_identifiers = []
+        self.used_labels = []
+        self.used_definitions = []
 
         self.parse_program()
 
         # Check that all labels are defined
-        for label in self.used_identifiers:
-            if label not in self.labels and label not in self.definitions:
-                raise CompilerException(CompilerException.LABEL,
-                                        "The identifier '{}' has not been defined".format(label), label)
+        for label in self.used_labels:
+            if label not in self.labels:
+                raise CompilerException(
+                    CompilerException.NAME, "The identifier '{}' has not been defined".format(label), label)
 
-        self.replace_definitions()
+        # Check if there are any labels or definitions that weren't used
+        for label in self.labels:
+            if label not in self.used_labels:
+                warnings.append(f"The label '{label}' on line {label.line} was never used")
+
+        for definition in self.definitions:
+            if definition not in self.used_definitions:
+                warnings.append(f"The definition '{definition}' on line {definition.line} was never used")
+
         self.instructions.append(['hlt'])
 
     def type(self, offset=0):
@@ -164,26 +175,6 @@ class Parser:
                 # if there is not a new line, there is an unexpected token
                 raise CompilerException(CompilerException.SYNTAX, 'Unexpected Token', self.value())
 
-    def replace_definitions(self):
-        """
-        Replaces any identifiers in the instructions list that have defined values (using the 'define' instruction)
-        with their values. This should be called after parse_program has been run, so that the instructions list is
-        completely made and the definitions all have values in the definitions dictionary. If instructions are added
-        the label values are update to reflect this
-        """
-        for i in range(len(self.instructions) - 1, -1, -1):
-            instruction = self.instructions[i]
-            if (instruction[0] == 'ldu' or instruction[0] == 'ldb') and instruction[1] in self.definitions:
-                # delete the instruction with the identifier and write the instruction with the value of the identifier
-                del self.instructions[i]
-                instr_added = self.write_load(instruction[0], 'identifier', instruction[1], i)
-
-                # if more than one instruction was inserted, the values of the labels after it, need to change
-                if instr_added > 1:
-                    for label, value in self.labels.items():
-                        if value > i:
-                            self.labels[label] += (instr_added - 1)
-
     def parse_label(self):
         """
         Parses a label. A label consists of an identifier token, followed by a label token.
@@ -198,11 +189,11 @@ class Parser:
         Raises:
             CompilerException: If parsing the label succeeds, but the identifier is defined elsewhere
         """
-        if self.type() == 'identifier' and self.type(1) == 'label':
-            if self.value() not in self.labels:
-                self.labels[self.value()] = len(self.instructions)
-            else:
-                raise CompilerException(CompilerException.LABEL, 'Duplicate label', self.value())
+        if self.type() == 'identifier' and self.value(1) == ':':
+            if self.value() in self.labels or self.value() in self.definitions:
+                raise CompilerException(CompilerException.NAME, f"The identifier '{self.value()}' has multiple "
+                                                                f"definitions", self.value())
+            self.labels[self.value()] = len(self.instructions)
             self.index += 2
             return True
         return False
@@ -224,20 +215,153 @@ class Parser:
             raise CompilerException(CompilerException.ARG,
                                     "Expected identifier after a 'define' keyword", self.value(1))
 
-        if not self.type(2) == 'integer' or not -32768 <= self.value(2) < 65536:
-            # if the value is None we use the previous token and shift it right so the pointer points to the empty
-            # space where the argument should be
-            error_token = self.value(2)
-            if error_token is None:
-                error_token = self.value(1)
-                error_token.pos += len(error_token) + 1
-            error_type = CompilerException.VALUE if self.type(2) == 'integer' else CompilerException.ARG
-            raise CompilerException(error_type, "Expected integer in the range -32768 to 65535 (inclusive) for "
-                                                "argument to 'define' instruction", error_token)
+        name = self.value(1)
+        if name in self.labels or name in self.definitions:
+            raise CompilerException(CompilerException.NAME, f"The identifier '{name}' has multiple "
+                                                            f"definitions", name)
+        self.index += 2
+        try:
+            tokentype, value = self.parse_constant_expression()
+        except CompilerException as ce:
+            ce.msg = ce.msg.format('define')
+            raise ce
 
-        self.definitions[self.value(1)] = self.value(2)
-        self.index += 3
+        if value is None:
+            raise CompilerException(CompilerException.SYNTAX, "Expected constant expression as argument to the"
+                                                              " 'define' instruction", self.value())
+
+        self.definitions[name] = value
         return True
+
+    def parse_constant_expression(self):
+        """
+        Parses a constant value. A constant is defined as
+        ConstantExpression:
+            label
+            BitwiseOrExpression
+
+        BitwiseOrExpression:
+            BitwiseAndExpression ('|' BitwiseAndExpression)*
+
+        BitwiseAndExpression:
+            ArithmeticExpression ('&' ArithmeticExpression)*
+
+        ArithmeticExpression:
+            UnaryExpression (('+' | '-') UnaryExpression)*
+
+        UnaryExpression:
+            ('-' | '!')* Primary
+
+        Primary:
+            definition
+            integer
+            (BitwiseOrExpression)
+
+        This allows in bitwise and arithmetic operations to bw performed on definitions and integers, where unary
+        operators have the highest precedence followed by (+, -) then &, then |. This grammar prohibits operators from
+        being used on labels. If a constant expression is not a label, it will be able to be evaluated completely, since
+        all definitions must be defined before they are used.
+
+        Each non-terminal above will be implemented in its own function, which returns true if it was successfully
+        parsed. If a function returns False, it must restore the index back to its original value if its been changed
+
+        Returns:
+            (tokentype, value): tokentype is the type of the expression. If it is a label, then type='identifier',
+                otherwise type='integer'. value is the value of the expression. If it is a label, this will be a
+                String object containing the label, otherwise it is an integer.
+        """
+        if self.type() == 'identifier' and self.value() not in self.definitions:
+            self.used_labels.append(self.value())
+            self.index += 1
+            return self.type(-1), self.value(-1)
+        return 'integer', self.parse_or_expression()
+
+    def parse_or_expression(self):
+        """See docstring for parse_constant_expression"""
+        value = self.parse_and_expression()
+        while self.value() == '|':
+            self.index += 1
+            value |= self.parse_and_expression()
+        return value
+
+    def parse_and_expression(self):
+        """See docstring for parse_constant_expression"""
+        value = self.parse_arithmetic_expression()
+        while self.value() == '&':
+            self.index += 1
+            value &= self.parse_arithmetic_expression()
+        return value
+
+    def parse_arithmetic_expression(self):
+        """See docstring for parse_constant_expression"""
+        value = self.parse_unary_expression()
+        tokenvalue = self.value()
+        while tokenvalue in ['+', '-']:
+            self.index += 1
+            if tokenvalue == '+':
+                value += self.parse_unary_expression()
+            elif tokenvalue == '-':
+                value -= self.parse_unary_expression()
+            tokenvalue = self.value()
+        return value
+
+    def parse_unary_expression(self):
+        """See docstring for parse_constant_expression"""
+        minus = False
+        invert = False
+        while self.value() in ['-', '!']:
+            if self.value() == '-':
+                minus = not minus
+            elif self.value() == '!':
+                invert = not invert
+            self.index += 1
+        value = self.parse_primary()
+        if minus:
+            value = -value
+        if invert:
+            value = ~value
+        return value
+
+    def parse_primary(self):
+        """See docstring for parse_constant_expression"""
+        value = self.value()
+        if self.type() == 'identifier':
+            if value in self.definitions:
+                self.index += 1
+                self.used_definitions.append(value)
+                return self.definitions[value]
+            raise CompilerException(CompilerException.NAME,
+                                    "Invalid name, '{}', used in expression. Constants must be defined before they are "
+                                    "used, and labels cannot be used in expressions".format(value), value)
+
+        if self.type() == 'integer':
+            if not -32768 <= value < 65536:
+                raise CompilerException(CompilerException.VALUE, "Integer literals must be in the range -32768 to 65535"
+                                                                 " (inclusive)", value)
+            self.index += 1
+            return value.value
+
+        if value == '(':
+            self.index += 1
+            expression_value = self.parse_or_expression()
+            if self.value() == ')':
+                self.index += 1
+                return expression_value
+            if self.value() is None:
+                raise CompilerException(CompilerException.SYNTAX, 'Unmatched bracket', value)
+            else:
+                raise CompilerException(CompilerException.SYNTAX, 'Unexpected token. Expected closing bracket',
+                                        self.value())
+
+        if value is None:
+            prev = self.value(-1)
+            value = PositionObject(value, prev.line, prev.pos + len(prev) + 1)
+            raise CompilerException(CompilerException.SYNTAX, "Missing argument for '{}' instruction. Expected label, "
+                                                              "constant, or expression involving constants", value)
+        else:
+            raise CompilerException(CompilerException.SYNTAX,
+                                    "Unexpected token. Expected label, constant, or expression involving constants",
+                                    value)
 
     def parse_instruction(self):
         """
@@ -279,12 +403,18 @@ class Parser:
             return self.addinstr(instruction)
 
         # write the pseudoinstructions ldb, ldu and lda
-        if self.value() == 'ldb' or self.value() == 'ldu':
-            self.write_load(self.value(), self.type(1), self.value(1))
-            self.index += 2
+        instr = self.value()
+        if instr in ['ldb', 'ldu']:
+            self.index += 1
+            try:
+                tokentype, value = self.parse_constant_expression()
+            except CompilerException as ce:
+                ce.msg = ce.msg.format(instr)
+                raise ce
+            self.write_load(instr, tokentype, value)
             return True
 
-        if self.value() == 'lda':
+        if instr == 'lda':
             self.index += 1
             self.write_lda()
             return True
@@ -331,37 +461,20 @@ class Parser:
             The number of instructions written. Will be either 1 or 2, depending on the value of the argument
 
         Raises:
-            CompilerException:
-                - If the argument to the load instruction is not an identifier or integer
-                - If the argument to the load instruction is an integer but it is not in the
-                    range -32768 to 65536 (inclusive)
+            BaseException: If tokentype is not 'integer' or 'identifier'
         """
         # If index is not supplied, set it to the end of the instructions list
         if index is None:
             index = len(self.instructions)
 
         if tokentype == 'identifier':
-            self.used_identifiers.append(value)
-            # If the identifier is defined, we can write the value
-            # we do this by changing the tokentype to integer, so the if statement below will catch it
-            if value in self.definitions:
-                tokentype = 'integer'
-                value = self.definitions[value]
-            # Otherwise, the identifer is either a label, or we don't yet know its value
-            # Either way, we can resolve it yet, so we just write the load with the label as the argument
-            # If it is a definition that hasn't been defined yet, then this will be rewritten on the second pass
-            # If it is a label, it will be rewritten when the labels are resolved in the labelencoder
-            else:
-                self.instructions.insert(index, [instr, value])
-                return 1
+            # If the argument is an identifier, it must be a label. Since we don't yet know the values of the labels we
+            # just write the load with the label as the argument. It will be rewritten when the labels are resolved in
+            # the labelencoder
+            self.instructions.insert(index, [instr, value])
+            return 1
 
         if tokentype == 'integer':
-            # ldb arguments must fit in 16 bits
-            if not -32768 <= value < 65536:
-                raise CompilerException(CompilerException.VALUE,
-                                        "Expected integer in the range -32768 to 65535 (inclusive) "
-                                        "for argument to '{}' instruction".format(instr), value)
-
             # If the integer is in a position object, we need to extract it. This is fine because there are no longer
             # any errors that can occur with this instruction. We need to support both integers and PositionObjects,
             # because the label encoder uses integers
@@ -384,16 +497,10 @@ class Parser:
             self.instructions.insert(index, ['ldb', ~value & 0xFF])
             return 2
 
-        # If not an identifier or integer, then we have an error
-        # This code is to ensure that the error pointer works if there is no argument
-        # See the comment in parse_instruction for more details
-        if value is not None:
-            errtoken = value
-        else:
-            errtoken = self.value(-1)
-            errtoken.pos += 4
-        raise CompilerException(CompilerException.ARG, "Expected integer or label for argument to '{}' instruction"
-                                .format(instr), errtoken)
+        # We shouldn't ever reach this stage, becuase parse_constant_expression should have caught any errors
+        raise BaseException("An argument that is neither an integer or label was passed into the write_load function."
+                            "Occurred while parsing the instruction {} on line {}. Please update this function to "
+                            "handle this case.".format(self.tokens[self.line], self.line))
 
     def write_lda(self):
         """
@@ -412,11 +519,11 @@ class Parser:
                     range -32768 to 65536 (inclusive)
         """
         try:
-            self.write_load('ldu', self.type(), self.value())
+            tokentype, value = self.parse_constant_expression()
+            self.write_load('ldu', tokentype, value)
             self.addinstr(['mov', 'L', 'H'])
-            self.write_load('ldb', self.type(), self.value())
-            self.index += 1
-        except CompilerException as cs:
+            self.write_load('ldb', tokentype, value)
+        except CompilerException as ce:
             # The error needs to be caught and raised again, so we can change the message to read lda rather than ldu
-            cs.msg = cs.msg.replace('ldu', 'lda')
-            raise cs
+            ce.msg = ce.msg.format('lda')
+            raise ce

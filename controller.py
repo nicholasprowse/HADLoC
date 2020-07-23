@@ -2,14 +2,18 @@
 import sys
 import os
 
-import writer
+
 import argparse
 from serial.tools import list_ports
 from serial import SerialException
 import serial
 
+import writer
 from assembler.assembler import assemble
-from error import HADLOCException, printerror
+from error import HADLOCException
+from utils import file_name
+
+# TODO Serial read can raise a SerialError if the connection is lost midread. Should catch these errors
 
 
 def get_serial():
@@ -91,8 +95,7 @@ def get_serial_from_args(args):
         if ser is None:
             raise HADLOCException(HADLOCException.SERIAL,
                                   'Unable to connect to EEPROM writer. Please ensure it is connected')
-        return ser
-    if args.port is not None:
+    elif args.port is not None:
         ser = connect_serial(args.port)
         if ser == INCORRECT_PORT_ERROR:
             raise HADLOCException(HADLOCException.SERIAL,
@@ -102,8 +105,10 @@ def get_serial_from_args(args):
             raise HADLOCException(HADLOCException.SERIAL,
                                   "The serial port '{}' does not exist. For a list of current "
                                   "serial ports use '{} serialports'".format(args.port, parser.prog))
-        return ser
-    return get_serial()
+    else:
+        ser = get_serial()
+    print("Connection established to programmer", flush=True)
+    return ser
 
 
 def execute_load(args):
@@ -120,13 +125,18 @@ def execute_read(args):
 
 
 def execute_assemble(args):
-    files = assemble(args.file)
-    print('Successfully Assembled')
+    warnings, files = assemble(args.file)
+    print("Successfully Assembled '{}' with {} warning{}".format(file_name(args.file), len(warnings),
+                                                                 '' if len(warnings) == 1 else 's'), flush=True)
+    for warning in warnings:
+        print(warning)
+
     if args.c:
         for i in range(1, len(files)):
             os.remove(files[i])
     if args.l:
         writer.write_data(get_serial_from_args(args), open(files[0], 'r'))
+        print("Successfully Loaded '{}' onto EEPROM".format(file_name(files[0])))
 
 
 def find_serialport_auto():
@@ -302,6 +312,23 @@ def main():
             args.func(args)
         except HADLOCException as exception:
             exception.display()
+
+
+def test():
+    try:
+        import tokenizer
+        import parser
+        file = open('/Users/nicholasprowse/Documents/Programming/HADLoC Programs/test/test.hdc', 'r')
+        tokens = tokenizer.tokenize(file)
+        # print(tokens)
+        file.close()
+        warnings = []
+        parse = parser.Parser(tokens, warnings)
+        for warning in warnings:
+            print(warning)
+        # print(parse.instructions)
+    except HADLOCException as exc:
+        exc.display()
 
 
 if __name__ == "__main__":

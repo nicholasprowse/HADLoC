@@ -1,4 +1,5 @@
 from error import CompilerException
+import writer
 
 
 def write_code(instructions, file_name):
@@ -31,26 +32,10 @@ def write_code(instructions, file_name):
     file.close()
 
     file = open(files[1], 'w')
-    for address in range(0, len(machinecode), 16):
-        if address % 512 == 0:
-            file.write('\u2501' * 5 + ('\u254B' if address > 0 else '\u2533') + '\u2501' * 49 + '\n     \u2503 ')
-            for n in range(16):
-                if n == 8:
-                    file.write(" ")
-                file.write("X{:1X} ".format(n))
-            file.write('\n' + '\u2501' * 5 + '\u254B' + '\u2501' * 49 + '\n')
-        file.write("{:03X}X \u2503 ".format(address // 16))
-        for n in range(min(16, len(machinecode) - address)):
-            if n == 8:
-                file.write(" ")
-            file.write("{:02X} ".format(machinecode[address + n]))
-        file.write('\n')
-    file.close()
-
+    writer.display(file, machinecode, 'hex')
     file = open(files[2], 'w')
-    for byte in machinecode:
-        file.write("{:08b}\n".format(byte))
-    file.close()
+    writer.display(file, machinecode, 'bin')
+
     return files
 
 

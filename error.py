@@ -28,12 +28,12 @@ class HADLOCException(Exception):
     EXCEPTION = 0
     SYNTAX = 1
     ARG = 2
-    LABEL = 3
+    NAME = 3
     FILE = 4
     SERIAL = 5
     VALUE = 6
 
-    ERROR_NAMES = {EXCEPTION: "Exception", SYNTAX: "Syntax", ARG: "Argument", LABEL: "Label", FILE: "File",
+    ERROR_NAMES = {EXCEPTION: "Exception", SYNTAX: "Syntax", ARG: "Argument", NAME: "Name", FILE: "File",
                    SERIAL: "Serial", VALUE: "Value"}
 
     def __init__(self, error_type, msg):
