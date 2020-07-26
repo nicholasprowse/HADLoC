@@ -2,7 +2,7 @@ import os
 import error
 
 from error import CompilerException
-from cstring import LinedCode, PositionObject
+from cstring import LinedCode, CodeObject
 
 keywords = ['lda', 'ldb', 'ldu', 'mov', 'jmp', 'jlt', 'jeq', 'jgt', 'jle', 'jge', 'jne', 'nop', 'jis', 'jcs', 'opd',
             'opi', 'hlt', 'not', 'neg', 'inc', 'dec', 'sub', 'and', 'or', 'add', 'ics', 'icc', 'define']
@@ -59,20 +59,25 @@ class Tokenizer:
                     or self.newline()):
                 raise CompilerException(CompilerException.SYNTAX, 'Unexpected character', self.code[0])
 
-    def addtoken(self, tokentype, value):
+    def addtoken(self, tokentype, text, value=None):
         """
-        Helper function to add a new token at the same time as returning True
+        Helper function to add a new token at the same time as returning True. The text and value arguments are wrapped
+        in a CodeObject. If value is not provided, it will be set to the value of text.
 
         Args:
             tokentype (str): The type of the token.
                 Must be one of 'keyword', 'identifier', 'register', 'label', 'integer'
-            value: The value of the token. Should be either a String object or a PositionObject, so that line and
-                position data is stored with the value
+            text (PositionedString): The string from the code that generated the token
+            value: The value of the token. This represents the value of the token. For example, if the token is an
+                integer, value would be an int, that is the value of the token. If value is not passed, it gets set to
+                text
 
         Returns:
             (bool): True
         """
-        self.tokens[-1].append((tokentype, value))
+        if value is None:
+            value = text
+        self.tokens[-1].append((tokentype, CodeObject(text, value)))
         return True
 
     def tokenize_keyword_identifier_register(self):
@@ -134,10 +139,10 @@ class Tokenizer:
         Returns:
             bool: True if an operator was tokenized, False otherwise
         """
-        for symbol in symbols:
-            if self.code.match(symbol):
-                return self.addtoken('symbol', self.code[-1])
-        return False
+        symbol = self.code.matchany(symbols)
+        if symbol is None:
+            return False
+        return self.addtoken('symbol', symbol)
 
     def tokenize_int(self):
         """
@@ -167,8 +172,8 @@ class Tokenizer:
         Raises:
             CompilerException: If the token starts with '0b' or '0B', but contains no binary digits directly after
         """
-        first = self.code[0]
-        if not (self.code.match('0b') or self.code.match('0B')):
+        start = self.code.offset
+        if self.code.matchany(['0b', '0B']) is None:
             return False
 
         if self.code.match('0'):
@@ -184,7 +189,7 @@ class Tokenizer:
             elif self.code.match('1'):
                 n = 2 * n + 1
             else:
-                return self.addtoken('integer', PositionObject(n, first.line, first.pos))
+                return self.addtoken('integer', self.code.substring_index(start), n)
 
     def tokenize_oct(self):
         """
@@ -194,7 +199,7 @@ class Tokenizer:
         Returns:
             (bool): True if an octal integer was tokenized, False otherwise
         """
-        first = self.code[0]
+        start = self.code.offset
         if not self.code.match('0'):
             return False
 
@@ -204,7 +209,7 @@ class Tokenizer:
             if char is not None:
                 n = 8 * n + int(char)
             else:
-                return self.addtoken('integer', PositionObject(n, first.line, first.pos))
+                return self.addtoken('integer', self.code.substring_index(start), n)
 
     def tokenize_dec(self):
         """
@@ -214,7 +219,7 @@ class Tokenizer:
         Returns:
             (bool): True if a decimal integer was tokenized, False otherwise
         """
-        first = self.code[0]
+        start = self.code.offset
         char = self.code.matchrange('0', '9')
         if char is None:
             return False
@@ -225,7 +230,7 @@ class Tokenizer:
             if char is not None:
                 n = 10 * n + int(char)
             else:
-                return self.addtoken('integer', PositionObject(n, first.line, first.pos))
+                return self.addtoken('integer', self.code.substring_index(start), n)
 
     def tokenize_hex(self):
         """
@@ -239,8 +244,8 @@ class Tokenizer:
         Raises:
             CompilerException: If the token starts with '0x' or '0X', but contains no hexadecimal digits directly after
         """
-        first = self.code[0]
-        if not (self.code.match('0x') or self.code.match('0X')):
+        start = self.code.offset
+        if self.code.matchany(['0x', '0X']) is None:
             return False
 
         try:
@@ -254,7 +259,7 @@ class Tokenizer:
                 n = 16 * n + int(self.code[0])
                 self.code.advance()
             except ValueError:
-                return self.addtoken('integer', PositionObject(n, first.line, first.pos))
+                return self.addtoken('integer', self.code.substring_index(start), n)
 
     def tokenize_char(self):
         """
@@ -271,6 +276,7 @@ class Tokenizer:
                     in the correct place (i.e. with one character between the 2 quotation marks)
                 - If the character inside the quotation marks is outside of the ASCII range 32 to 126 (inclusive)
         """
+        start = self.code.offset
         if not self.code.match("'"):
             return False
 
@@ -278,10 +284,10 @@ class Tokenizer:
             raise CompilerException(CompilerException.SYNTAX, "Invalid character literal",
                                     self.code[0] if self.code[0] == "'" else self.code[-1])
 
-        c = self.code[0].chars[0].value
+        c = self.code[0].text
         self.code.advance(2)
         if 32 <= ord(c) <= 126:
-            return self.addtoken('integer', PositionObject(ord(c), self.code[-2].line, self.code[-2].pos))
+            return self.addtoken('integer', self.code.substring_index(start), ord(c))
         else:
             raise CompilerException(CompilerException.SYNTAX, "Invalid character literal", self.code[-2])
 

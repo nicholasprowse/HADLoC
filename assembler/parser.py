@@ -92,7 +92,7 @@ class Parser:
 
         for definition in self.definitions:
             if definition not in self.used_definitions:
-                warnings.append(f"The definition '{definition}' on line {definition.line} was never used")
+                warnings.append(f"The constant '{definition}' on line {definition.line} was never used")
 
         self.instructions.append(['hlt'])
 
@@ -126,7 +126,7 @@ class Parser:
         """
         if self.index + offset >= len(self.tokens[self.line]):
             return None
-        return self.tokens[self.line][self.index + offset][1]
+        return self.tokens[self.line][self.index + offset][1].value
 
     def addinstr(self, instr):
         """

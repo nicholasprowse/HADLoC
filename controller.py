@@ -315,21 +315,13 @@ def main():
 
 
 def test():
+    f = open("/Users/nicholasprowse/Documents/Programming/HADLoC Programs/test/test.hdc")
     try:
-        import tokenizer
-        import parser
-        file = open('/Users/nicholasprowse/Documents/Programming/HADLoC Programs/test/test.hdc', 'r')
-        tokens = tokenizer.tokenize(file)
-        # print(tokens)
-        file.close()
-        warnings = []
-        parse = parser.Parser(tokens, warnings)
-        for warning in warnings:
-            print(warning)
-        # print(parse.instructions)
-    except HADLOCException as exc:
-        exc.display()
+        assemble(f)
+    except HADLOCException as he:
+        he.display()
+    f.close()
 
 
 if __name__ == "__main__":
-    main()
+    test()
