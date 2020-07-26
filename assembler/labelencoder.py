@@ -1,5 +1,4 @@
 from error import CompilerException
-from cstring import String
 
 # TODO As yet this cannot handle situations that are unsolvable without nop's
 # For example: if there is a label at instruction 255 with a single ldb instruction before it
@@ -75,7 +74,7 @@ def encode_labels(parser):
     _, finished = find_lengths(labels, finished, instructions)
 
     if len(finished) < len(labels):
-        raise CompilerException(CompilerException.LABEL, 'Not able to resolve label locations', 0)
+        raise CompilerException(CompilerException.NAME, 'Not able to resolve label locations', 0)
     else:
         for i in range(len(instructions)-1, -1, -1):
             instruction = instructions[i]
@@ -193,10 +192,10 @@ def update_minmax(labels, instructions):
 
     for i in range(len(instructions)):
         instruction = instructions[i]
-        # Don't need to check ldu instructions, becuase labels have fit in be 15 bits, meaning an ldu is guaranteed
+        # Don't need to check ldu instructions, becuase labels have to fit in be 15 bits, meaning an ldu is guaranteed
         # be one instruction
         if instruction[0] == 'ldb':
-            if type(instruction[1]) == String:
+            if type(instruction[1].value) == str:
                 if labels[instruction[1]]['len'] == 0:
                     for label, pos in labels.items():
                         if pos['orig'] > i:

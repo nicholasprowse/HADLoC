@@ -1,5 +1,3 @@
-from error import CompilerException
-
 
 class Code:
     """
@@ -34,7 +32,6 @@ class Code:
                 for i in range(len(self.string) - 1, 0, -1):
                     if self.string[i].line != self.string[i - 1].line:
                         self.string.insert(i, ' ')
-            self.removecomments()
 
     def substring_length(self, length):
         """
@@ -51,7 +48,7 @@ class Code:
         """
         return self.string[self.offset: min(self.offset + length, len(self.string))]
 
-    def substring_index(self, start=None, end=None):
+    def substring_absolute(self, start=None, end=None):
         """
         Returns a PositionedString, that is a substring starting and ending at at the given offsets. The starting and
         ending values are absolute (not relative to the current offset). If either the start or end is not provided,
@@ -65,7 +62,20 @@ class Code:
             start = self.offset
         if end is None:
             end = self.offset
-        return self.string[start:end]
+        return self.string[start: min(end, len(self.string))]
+
+    def substring_relative(self, start=0, end=0):
+        """
+        Returns a PositionedString, that is a substring starting and ending at at the given offsets. The starting and
+        ending values are relative to the current offset. If either the start or end is not provided, they default to 0
+        start is inclusive, while end is exclusive
+
+        Args:
+            start (int): The index of the start of the substring
+            end (int): The index of the end of the substring (not inclusive)
+        Returns: A PositionedString that is a substring from start to end
+        """
+        return self.string[start + self.offset: min(end + self.offset, len(self.string))]
 
     def hasmore(self):
         """Returns True if there are more characters left to process"""
@@ -113,10 +123,9 @@ class Code:
         Returns:
             The PositionedString that matched, or None is none of the strings matched
         """
-        start = self.offset
         for match in matches:
             if self.match(match):
-                return self.substring_index(start)
+                return self.substring_relative(-len(match))
         return None
 
     def match(self, match):
@@ -158,67 +167,14 @@ class Code:
     def __getitem__(self, item):
         """
         Returns the character at the given location, relative to the offset.
-        If the requested item is out of range, the null character will be returned.
+        If the requested item is out of range, the null character will be returned, with the position of the final
+        character.
         """
         if item < len(self):
             return self.string[item + self.offset]
         else:
-            return PositionedString('\0', [0], [0])
-
-    def removecomments(self):
-        """
-        Removes all comments from the code.
-        There are 2 types of comment
-        End of Line Comments:
-            EOL comments start with '//' and end and the end of the line.
-        Traditional Comments:
-            Traditional comments start with '/*' and end at the first instance of '*/'.
-            Traditional comments can span over multiple lines
-        """
-        i = 0
-        while i < len(self.string) - 1:
-            while self.string.substring(i, i + 2) == '//':
-                for j in range(i + 2, len(self.string) + 1):
-                    if j == len(self.string):
-                        del self.string[i:j]
-                        break
-
-                    if self.string[j].line() != self.string[i].line():
-                        del self.string[i:j]
-                        break
-
-            # Remove Traditional comments
-            while self.string.substring(i, i + 2) == '/*':
-                for j in range(i + 2, len(self.string) + 1):
-                    if j == len(self.string):
-                        raise CompilerException(CompilerException.SYNTAX, 'Comment not closed',
-                                                self.string[i])
-                    if self.string.substring(j, j + 2) == '*/':
-                        del self.string[i:j + 2]
-                        break
-
-            i += 1
-
-        # for i in range(len(self.string) - 2, -1, -1):
-        #     # Remove EOL comments
-        #     if self.string.substring(i, i + 2) == '//':
-        #         for j in range(i + 2, len(self.string) + 1):
-        #             if j == len(self.string):
-        #                 del self.string[i:j]
-        #                 break
-        #
-        #             if self.string[j].line != self.string[i].line:
-        #                 del self.string[i:j]
-        #                 break
-        #
-        #     # Remove Traditional comments
-        #     if self.string.substring(i, i + 2) == '/*':
-        #         for j in range(i + 2, len(self.string) + 1):
-        #             if j == len(self.string):
-        #                 raise CompilerException(CompilerException.SYNTAX, 'Comment not closed', self.string[i])
-        #             if self.string.substring(j, j + 2) == '*/':
-        #                 del self.string[i:j + 2]
-        #                 break
+            last_char = self.string[-1]
+            return PositionedString('\0', last_char.lines, last_char.positions)
 
     def stripwhitespace(self):
         """
@@ -261,15 +217,15 @@ class Code:
         return str(self)
 
 
-class LinedCode(Code):
+class LinedCode:
     """
     Behaves exactly the same as a Code object but it respects line boundaries.
     This means that no functions will advance past line boundaries except the advanceline() function.
     This allows tokenizers to easily find line boundaries, as they must acknowledge them to continue advancing.
 
     Args:
-        text (str or String): The text of the code. Trailing and leading whitespace on each line will be removed.
-            If a primitive string is passed, then all comments will also be removed
+        text (str or PositionedString): The text of the code. Trailing and leading whitespace on each line will be
+            removed. If a primitive string is passed, then all comments will also be removed
 
     Attrubutes:
         lines (list<Code>): List of Code objects, where each one is a single line
@@ -277,25 +233,57 @@ class LinedCode(Code):
     """
 
     def __init__(self, text):
-        super().__init__(text)
+        if type(text) == str:
+            text = PositionedString.create_string(text, keepends=False)
         self.lines = []
         self.line = 0
 
         # seperate out the lines
-        linenumber = self.string[0].line()
+        linenumber = 0
         lastlineindex = 0
-        for i in range(len(self.string)):
-            if self.string[i].line() != linenumber:
-                nextline = Code(self.string[lastlineindex: i])
+        for i in range(len(text)):
+            if text[i].line() != linenumber:
+                nextline = Code(text[lastlineindex: i])
                 nextline.stripwhitespace()
                 if not nextline.string.isspace():
                     self.lines.append(nextline)
                 lastlineindex = i
-                linenumber = self.string[i].line()
-        lastline = Code(self.string[lastlineindex: len(self.string)])
+                linenumber = text[i].line()
+        lastline = Code(text[lastlineindex: len(text)])
         lastline.stripwhitespace()
         if not lastline.string.isspace():
             self.lines.append(lastline)
+
+    def getoffset(self):
+        """Returns the current index of the line that is currently being processed"""
+        return self.current_line().offset
+
+    def substring_absolute(self, start=None, end=None):
+        """
+        Returns a PositionedString, that is a substring starting and ending at at the given offsets. The starting and
+        ending values are absolute within the current line (not relative to the current offset).
+        If either the start or end is not provided, it defaults to the current offset. Substrings will not span
+        multiple lines
+        Args:
+            start (int): The index of the start of the substring
+            end (int): The index of the end of the substring (not inclusive)
+        Returns: A PositionedString that is a substring from start to end
+        """
+        return self.current_line().substring_absolute(start=start, end=end)
+
+    def substring_relative(self, start=0, end=0):
+        """
+        Returns a PositionedString, that is a substring starting and ending at at the given offsets. The starting and
+        ending values are relative to the current offset.
+        If either the start or end is not provided, they default to 0
+        start is inclusive, while end is exclusive.
+        Substrings will not span multiple lines
+        Args:
+            start (int): The index of the start of the substring
+            end (int): The index of the end of the substring (not inclusive)
+        Returns: A PositionedString that is a substring from start to end
+        """
+        return self.current_line().substring_relative(start=start, end=end)
 
     def advance(self, amount=1):
         """
@@ -309,7 +297,7 @@ class LinedCode(Code):
         Returns:
             String: Substring of the string advanced past
         """
-        return self.lines[self.line].advance(amount)
+        return self.current_line().advance(amount)
 
     def advancepast(self, match):
         """
@@ -321,7 +309,7 @@ class LinedCode(Code):
         Returns:
             If match was found, returns a String containing the text advanced past. Otherwise returns None.
         """
-        return self.lines[self.line].advancepast(match)
+        return self.current_line().advancepast(match)
 
     def advanceline(self):
         """
@@ -330,7 +318,7 @@ class LinedCode(Code):
         Returns:
             True if a line was advanced past, otherwise False
         """
-        if self.line < len(self.lines) - 1 and not self.lines[self.line].hasmore():
+        if self.line < len(self.lines) - 1 and not self.current_line().hasmore():
             self.line += 1
             return True
         return False
@@ -345,7 +333,19 @@ class LinedCode(Code):
         Returns:
             True if the given string is advanced past, False otherwise
         """
-        return self.lines[self.line].match(match)
+        return self.current_line().match(match)
+
+    def matchany(self, matches):
+        """
+        If the code immediatly following the current offset matches one of the string in the matches argument, then that
+        string is returned as a PositionedString, and the matching code is advanced past.
+        If None of the strings match, returns None.
+        Args:
+            matches (list<str>): A list of strings to match
+        Returns:
+            The PositionedString that matched, or None is none of the strings matched
+        """
+        return self.current_line().matchany(matches)
 
     def matchrange(self, lower, upper):
         """
@@ -358,7 +358,7 @@ class LinedCode(Code):
         Returns:
             If the current character is in the given range, then the character is returned, otherwise None is returned
         """
-        return self.lines[self.line].matchrange(lower, upper)
+        return self.current_line().matchrange(lower, upper)
 
     def substring_length(self, length):
         """
@@ -371,19 +371,19 @@ class LinedCode(Code):
         Returns:
             String: String object that is a substring of this starting starting at offset, with a given length
         """
-        return self.lines[self.line].substring_length(length)
-    
+        return self.current_line().substring_length(length)
+
     def hasmore(self):
         """Returns True if there are more characters left to process"""
-        return self.line < len(self.lines) - 1 or self.lines[self.line].hasmore()
+        return self.line < len(self.lines) - 1 or self.current_line().hasmore()
 
-    def skip_whitespace(self):
-        """Moves the offset past any whitespace at the current position, without moving past line boundaries"""
-        self.lines[self.line].skip_whitespace()
+    def current_line(self):
+        """Returns the line that is currently being processed"""
+        return self.lines[self.line]
 
     def __len__(self):
         """Returns the length of the code after (and including the offset)"""
-        length = len(self.lines[self.line])
+        length = len(self.current_line())
         for i in range(self.line + 1, len(self.lines)):
             length += len(self.lines[i])
         return length
@@ -393,7 +393,7 @@ class LinedCode(Code):
         Returns the character at the given location, relative to the offset.
         If the requested item is on a different line to the current line, then the null character is returned
         """
-        return self.lines[self.line][item]
+        return self.current_line()[item]
 
     def __str__(self):
         string = "('"
@@ -404,205 +404,6 @@ class LinedCode(Code):
 
     def __repr__(self):
         return str(self)
-
-
-class PositionObject:
-    """
-    Stores an object derived from some text. Stores the line number and position from with the object was originally
-    derived. This is useful so that errors can be generated showing the position of the error, even if the original
-    text has been modified.
-
-    Note: Line numbers start at one, while pos starts at 0
-
-    Args:
-        value (any): The object to store
-        line (int): the line number that the object was originally derived from
-        pos (int): the position on the line the object was originally derived from
-
-    Attributes:
-        value (any): The object to store
-        line (int): the line number that the object was originally derived from
-        pos (int): the position on the line the object was originally derived from
-    """
-
-    def __init__(self, value, line, pos):
-        self.value = value
-        self.pos = pos
-        self.line = line
-
-    def __eq__(self, other):
-        """
-        Tests if this object is equal to the other. When checking for equality, only the value attribute is checked.
-
-        Args:
-            other: The other object to test equality
-
-        Returns:
-            True if the value attribute equals the other object, otherwise False
-        """
-        if type(other) == PositionObject:
-            return self.value == other.value
-        return self.value == other
-
-    def __lt__(self, other):
-        """
-        Tests if this object is less than the other. Only the value attribute is relevant.
-
-        Args:
-            other: The other object to test equality
-
-        Returns:
-            True if the value attribute is less than the other object, otherwise False
-        """
-        if type(other) == PositionObject:
-            return self.value < other.value
-        return self.value < other
-
-    def __gt__(self, other):
-        """
-        Tests if this object is greater than to the other. Only the value attribute is relevant.
-
-        Args:
-            other: The other object to test equality
-
-        Returns:
-            True if the value attribute is greater than the other object, otherwise False
-        """
-        if type(other) == PositionObject:
-            return self.value > other.value
-        return self.value > other
-
-    def __le__(self, other):
-        """
-        Tests if this object is less than or equal to the other. Only the value attribute is relevant.
-
-        Args:
-            other: The other object to test equality
-
-        Returns:
-            True if the value attribute is less than the other object, otherwise False
-        """
-        if type(other) == PositionObject:
-            return self.value <= other.value
-        return self.value <= other
-
-    def __ge__(self, other):
-        """
-        Tests if this object is greater than or equal to the other. Only the char attribute is relevant.
-
-        Args:
-            other: The other object to test equality
-
-        Returns:
-            True if the value attribute is greater than the other object, otherwise False
-        """
-        if type(other) == PositionObject:
-            return self.value >= other.value
-        return self.value >= other
-
-    def __ne__(self, other):
-        """
-        Tests if this object is not equal to the other. Only the char attribute is relevant.
-
-        Args:
-            other: The other object to test equality
-
-        Returns:
-            True if the value attribute is not equal to the other object, otherwise False
-        """
-        if type(other) == PositionObject:
-            return self.value != other.value
-        return self.value != other
-
-    def __iand__(self, other):
-        """
-        Inplace and for PositionObjects. Ands together the two value properties,
-        and keeps location of first PositionObject
-        """
-        if type(other) == PositionObject:
-            self.value &= other.value
-        self.value &= other
-
-    def __and__(self, other):
-        """
-        Bitwise and for PositionObjects. Ands together the two value properties,
-        and keeps location of first PositionObject
-        """
-        if type(other) == PositionObject:
-            return PositionObject(self.value & other.value, self.line, self.pos)
-        return PositionObject(self.value & other, self.line, self.pos)
-
-    def __ior__(self, other):
-        """
-        Inplace or for PositionObjects. Ors together the two value properties,
-        and keeps location of first PositionObject
-        """
-        if type(other) == PositionObject:
-            self.value |= other.value
-        self.value |= other
-
-    def __or__(self, other):
-        """
-        Bitwise or for PositionObjects. Ors together the two value properties,
-        and keeps location of first PositionObject
-        """
-        if type(other) == PositionObject:
-            return PositionObject(self.value | other.value, self.line, self.pos)
-        return PositionObject(self.value | other, self.line, self.pos)
-
-    def __iadd__(self, other):
-        """
-        Inplace addition for PositionObjects. Ors together the two value properties,
-        and keeps location of first PositionObject
-        """
-        if type(other) == PositionObject:
-            self.value += other.value
-        self.value += other
-
-    def __add__(self, other):
-        """
-        Addition for PositionObjects. Adds together the two value properties,
-        and keeps location of first PositionObject
-        """
-        if type(other) == PositionObject:
-            return PositionObject(self.value + other.value, self.line, self.pos)
-        return PositionObject(self.value + other, self.line, self.pos)
-
-    def __isub__(self, other):
-        """
-        Inplace subtraction for PositionObjects. Subtracts the two value properties,
-        and keeps location of first PositionObject
-        """
-        if type(other) == PositionObject:
-            self.value -= other.value
-        self.value -= other
-
-    def __sub__(self, other):
-        """
-        Subtraction for PositionObjects. Subtracts the two value properties,
-        and keeps location of first PositionObject
-        """
-        if type(other) == PositionObject:
-            return PositionObject(self.value - other.value, self.line, self.pos)
-        return PositionObject(self.value - other, self.line, self.pos)
-
-    def __invert__(self):
-        """Returns the bitwise inverse of the value of this PositionObject, as a PositionObject"""
-        return PositionObject(~self.value, self.line, self.pos)
-
-    def __neg__(self):
-        """Returns the negative of the value of this PositionObject, as a PositionObject"""
-        return PositionObject(-self.value, self.line, self.pos)
-
-    def __str__(self):
-        return "(" + repr(self.value) + ", line=" + str(self.line) + ", pos=" + str(self.pos) + ')'
-
-    def __repr__(self):
-        return str(self.value)
-
-    def __len__(self):
-        """This is included for situations where Characters are treated as length 1 strings"""
-        return 1
 
 
 class CodeObject:
@@ -619,7 +420,8 @@ class CodeObject:
         text (PositionedString): The text, from the code, that this object derives from
         value (any): The value of this object. Optional attribute that describes the code
     """
-    def __init__(self, text, value):
+
+    def __init__(self, value, text):
         self.value = value
         self.text = text
 
@@ -714,7 +516,9 @@ class CodeObject:
         """
         if type(other) == CodeObject:
             self.value &= other.value
-        self.value &= other
+        else:
+            self.value &= other
+        return self
 
     def __and__(self, other):
         """
@@ -732,7 +536,9 @@ class CodeObject:
         """
         if type(other) == CodeObject:
             self.value |= other.value
-        self.value |= other
+        else:
+            self.value |= other
+        return self
 
     def __or__(self, other):
         """
@@ -750,7 +556,9 @@ class CodeObject:
         """
         if type(other) == CodeObject:
             self.value += other.value
-        self.value += other
+        else:
+            self.value += other
+        return self
 
     def __add__(self, other):
         """
@@ -768,7 +576,9 @@ class CodeObject:
         """
         if type(other) == CodeObject:
             self.value -= other.value
-        self.value -= other
+        else:
+            self.value -= other
+        return self
 
     def __sub__(self, other):
         """
@@ -778,6 +588,24 @@ class CodeObject:
         if type(other) == CodeObject:
             return CodeObject(self.value - other.value, self.text + other.text)
         return CodeObject(self.value - other, self.text)
+
+    def __lshift__(self, other):
+        """
+        Left shift operator for CodeObject. Left shifts this CodeObjects value by the value provided in the argument,
+        and adds together the text properties
+        """
+        if type(other) == CodeObject:
+            return CodeObject(self.value << other.value, self.text + other.text)
+        return CodeObject(self.value << other, self.text)
+
+    def __rshift__(self, other):
+        """
+        Right shift operator for CodeObject. Right shifts this CodeObjects value by the value provided in the argument,
+        and adds together the text properties
+        """
+        if type(other) == CodeObject:
+            return CodeObject(self.value >> other.value, self.text + other.text)
+        return CodeObject(self.value >> other, self.text)
 
     def __hash__(self):
         """Hashes are done based on the value attribute"""
@@ -792,10 +620,10 @@ class CodeObject:
         return CodeObject(-self.value, self.text)
 
     def __str__(self):
-        return "(" + str(self.value) + ", text=" + str(self.text) + ')'
+        return str(self.value)
 
     def __repr__(self):
-        return str(self.value)
+        return "(" + str(self.value) + ", text=" + str(self.text) + ')'
 
     def __len__(self):
         """Returns the length of the value attribute"""
@@ -820,6 +648,7 @@ class PositionedString:
         positions (list<int>): List of integers of the same length as the text, where each element is the position
             of the corresponding character in text, within its line
     """
+
     def __init__(self, text, lines, positions):
         """
         Creates a PositionedString, given the text, line numbers and positions of each character
@@ -889,7 +718,7 @@ class PositionedString:
         if type(string) == str:
             line = self.lines[index - 1] if index > 0 else 0
             position = self.positions[index - 1] if index > 0 else 0
-            string = PositionedString(string, [line]*len(string), [position]*len(string))
+            string = PositionedString(string, [line] * len(string), [position] * len(string))
 
         return self[:index] + string + self[index:]
 
@@ -937,23 +766,23 @@ class PositionedString:
         return False
 
     def __lt__(self, other):
-        assert type(other) == str or type(other) == String
+        assert type(other) == str or type(other) == PositionedString
         return str(self) < str(other)
 
     def __gt__(self, other):
-        assert type(other) == str or type(other) == String
+        assert type(other) == str or type(other) == PositionedString
         return str(self) > str(other)
 
     def __le__(self, other):
-        assert type(other) == str or type(other) == String
+        assert type(other) == str or type(other) == PositionedString
         return str(self) <= str(other)
 
     def __ge__(self, other):
-        assert type(other) == str or type(other) == String
+        assert type(other) == str or type(other) == PositionedString
         return str(self) >= str(other)
 
     def __ne__(self, other):
-        assert type(other) == str or type(other) == String
+        assert type(other) == str or type(other) == PositionedString
         return str(self) != str(other)
 
     def __add__(self, other):
@@ -1003,207 +832,3 @@ class PositionedString:
 
     def __repr__(self):
         return str(self)
-
-
-class String(PositionObject):
-    """
-    Represents a sequence of Character objects. Functions very similarly to the builtin str type, but each character has
-    its line number and position of where it is from in the original file. This allows the user to manipulate the
-    strings however they like, while still knowing where each character came from. Thus, error messages with the
-    original text from the file can be displayed, even though the strings have been changed.
-
-    Args:
-        text (list<PositionObject> or str): List of PositionObjects, each containing a character to be contained in this
-        string, or a str to be converted into a String. This argument is optional, if it is not supplied an
-        empty string will be created.
-
-    Attributes:
-        chars (list<PositionObject>): List of PositionObjects, each containing a charcter in this string
-    """
-
-    def __init__(self, text=None):
-        if text is None:
-            text = []
-        assert type(text) == str or type(text) == list
-        if type(text) == str:
-            self.chars = []
-            text = text.splitlines()
-            for i in range(len(text)):
-                for j in range(len(text[i])):
-                    self.chars.append(PositionObject(text[i][j], i + 1, j))
-        else:
-            self.chars = text
-
-        super().__init__(None, 0 if len(self.chars) == 0 else self.chars[0].line,
-                         0 if len(self.chars) == 0 else self.chars[0].pos)
-
-    def substring(self, start, end):
-        """
-        Returns a String object, that is a substring of the given length and starting at the current offset.
-        If the substring would extend past the length of the String, then all of the String after offset will be
-        returned
-
-        Args:
-            start (int): the index of the start of the substring (inclusive)
-            end (int): the index of the end of the substring (exclusive)
-
-        Returns:
-            String: String object that is a substring of this starting from start to end
-        """
-        return String(self.chars[start: end])
-
-    def insert(self, index, string):
-        """
-        Inserts a string at the given index. The string is inserted such that its first character will be at the
-        location given by index. String objects, or primitive strings can be inserted.
-
-        If a primitive string is inserted, then a the line numbers of the inserted characters will be the same as the
-        character before them, andthe position numbers will be one more than the character before them. All characters
-        inserted will be created with the same line and position values.
-
-        Args:
-            index (int): location within the String to insert the string
-            string (str or String): The string to insert
-        """
-        if type(string) == str:
-            for i in range(len(string) - 1, -1, -1):
-                if index == 0:
-                    char = PositionObject(string[i], 0, 0)
-                else:
-                    char = PositionObject(string[i], self.chars[index - 1].line, self.chars[index - 1].pos + 1)
-                self.chars.insert(index, char)
-        else:
-            for i in range(len(string) - 1, -1, -1):
-                self.chars.insert(index, string[i])
-
-    def isspace(self):
-        """Returns True if all characters in this string are whitespace"""
-        for char in self.chars:
-            if not char.value.isspace():
-                return False
-        return True
-
-    def isnumeric(self):
-        """Returns true if all characters in the string are numeric"""
-        for char in self.chars:
-            if not char.value.isnumeric():
-                return False
-        return True
-
-    def isalpha(self):
-        """Returns true if all characters in the string are alphabetic (i.e. letters)"""
-        for char in self.chars:
-            if not char.value.isalpha():
-                return False
-        return True
-
-    def isalnum(self):
-        """Returns true if all characters in the string are alphanumeric (i.e. letters or numbers)"""
-        for char in self.chars:
-            if not char.value.isalnum():
-                return False
-        return True
-
-    def __hash__(self):
-        return hash(str(self))
-
-    def __int__(self):
-        """
-        Converts the first character of this string into the hex value represented by it.
-        Works for all hex digits (capital and lowercase).
-
-        Raises:
-            ValueError: if the first character is not a hex character
-        """
-        char = self.chars[0].value
-        if '0' <= char <= '9':
-            return ord(char) - ord('0')
-        if 'a' <= char <= 'f':
-            return ord(char) - ord('a') + 10
-        if 'A' <= char <= 'F':
-            return ord(char) - ord('A') + 10
-        raise ValueError("invalid literal for int() with base 16: '" + char + "'")
-
-    def __eq__(self, other):
-        if type(other) == str:
-            return str(self) == other
-        if type(other) == String:
-            return str(self) == str(other)
-        return False
-
-    def __lt__(self, other):
-        assert type(other) == str or type(other) == String
-        return str(self) < str(other)
-
-    def __gt__(self, other):
-        assert type(other) == str or type(other) == String
-        return str(self) > str(other)
-
-    def __le__(self, other):
-        assert type(other) == str or type(other) == String
-        return str(self) <= str(other)
-
-    def __ge__(self, other):
-        assert type(other) == str or type(other) == String
-        return str(self) >= str(other)
-
-    def __ne__(self, other):
-        assert type(other) == str or type(other) == String
-        return str(self) != str(other)
-
-    def __add__(self, other):
-        assert type(other) == String
-        if type(other) == String:
-            return String(self.chars + other.chars)
-
-    def __iadd__(self, other):
-        """
-        iadd is the operator overload for inplace addition.
-        i.e. s += c
-        Works for other String objects and Character objects
-        """
-        assert type(other) == String
-        if type(other) == String:
-            self.chars += other.chars
-        return self
-
-    def __getitem__(self, key):
-        """Returns the character located at the specified index, or the slice specified by the range"""
-        if isinstance(key, slice):
-            return String(self.chars[key])
-        return String([self.chars[key]])
-
-    def __delitem__(self, key):
-        """Deletes the character located at the specified index, or the slice specified by the range"""
-        if isinstance(key, slice):
-            del self.chars[key]
-        else:
-            del self.chars[key]
-
-    def __len__(self):
-        """Returns the number of characters in this String"""
-        return len(self.chars)
-
-    def __str__(self):
-        s = ''
-        for i in self.chars:
-            s += i.value
-        return s
-
-    def __repr__(self):
-        return str(self)
-
-
-def main():
-    f = open("/Users/nicholasprowse/Desktop/mult.asm")
-    text = PositionedString.create_string(f.read(), keepends=False)
-    f.close()
-    print(text.text)
-    print(text.lines)
-    print(text.positions)
-
-    print('done')
-
-
-if __name__ == "__main__":
-    main()

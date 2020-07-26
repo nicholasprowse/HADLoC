@@ -47,17 +47,18 @@ class Tokenizer:
         # tokens = (type, value)
         self.tokens = [[]]
 
-        # while there are more characters, move past whitespace and then attempt to create a token.
-        # If a token cannot be created then there is a syntax error in the code.
-        # If there is whitespace at the end of code, then this would skip past it, but not be able to generate a
-        # token, creating an error when there shouldn'nt be one. However, this won't happen because leading and
-        # trailing whitespace is removed in the LinedCode Object.
+        # The code should be a series of alternating tokens and whitespace/comment sections. As such, we start by
+        # advancing past any whitespace/comments at the start, before continouosly tokenizing a token, and advancing
+        # over whitespace/comment. If we advanced over a line when tokenizing a whitespace/comment, we must check if
+        # there are more tokens before adding a new line, because we may have reached the end of the file.
+        self.skip_whitespace_and_comments()
         while self.code.hasmore():
-            self.code.skip_whitespace()
-
-            if not (self.tokenize_int() or self.tokenize_keyword_identifier_register() or self.tokenize_symbol()
-                    or self.newline()):
+            if not (self.tokenize_int() or self.tokenize_keyword_identifier_register() or self.tokenize_symbol()):
                 raise CompilerException(CompilerException.SYNTAX, 'Unexpected character', self.code[0])
+
+            if self.skip_whitespace_and_comments():
+                if self.code.hasmore():
+                    self.tokens.append([])
 
     def addtoken(self, tokentype, text, value=None):
         """
@@ -77,15 +78,53 @@ class Tokenizer:
         """
         if value is None:
             value = text
-        self.tokens[-1].append((tokentype, CodeObject(text, value)))
+        self.tokens[-1].append((tokentype, CodeObject(value, text)))
         return True
+
+    def skip_whitespace_and_comments(self):
+        """
+        Skips over any whitespace, and comments. Comments consist of any text between the '/*' and '*/' tokens, or
+        any text after the '//' token but before the end of the line. May skip multiple lines. If any line breaks are
+        skipped over, True is returned, otherwise, False is returned
+        Returns:
+            True if a line break was advanced over, False otherwise
+        """
+        skippedline = False
+        should_continue = True
+        while should_continue:
+            should_continue = False
+            while self.code[0].isspace():
+                should_continue = True
+                self.code.advance()
+
+            if self.code.match('//'):
+                should_continue = True
+                # Move offset to end of the current line
+                current_line = self.code.current_line()
+                current_line.advance(len(current_line))
+
+            comment_start = self.code.substring_length(2)
+            if self.code.match('/*'):
+                should_continue = True
+                while self.code.current_line().advancepast('*/') is None:
+                    skippedline = True
+                    if self.code.line < len(self.code.lines) - 1:
+                        self.code.line += 1
+                    else:
+                        raise CompilerException(error.CompilerException.SYNTAX, 'Comment not closed', comment_start)
+
+            if self.code.advanceline():
+                should_continue = True
+                skippedline = True
+
+        return skippedline
 
     def tokenize_keyword_identifier_register(self):
         """
         Tokenizes an intance of a keyword, identifer or register. Will only tokenize one token.
         A keyword is one of:
-            ('lda', 'ldb', 'mov', 'jmp', 'jlt', 'jeq', 'jgt', 'jle', 'jge', 'jne', 'nop', 'jmpc', 'jmpi', 'out',
-            'outi', 'hlt', 'not', 'neg', 'inc', 'dec', 'sub', 'and', 'or', 'add', 'carry', 'define')
+            ('lda', 'ldb', 'mov', 'jmp', 'jlt', 'jeq', 'jgt', 'jle', 'jge', 'jne', 'nop', 'jcs', 'jis', 'opd',
+            'opi', 'hlt', 'not', 'neg', 'inc', 'dec', 'sub', 'and', 'or', 'add', 'icc', 'ics', 'define')
 
         A register is one of:
             ('L', 'H', 'M', 'I', 'X', 'Y')
@@ -172,7 +211,7 @@ class Tokenizer:
         Raises:
             CompilerException: If the token starts with '0b' or '0B', but contains no binary digits directly after
         """
-        start = self.code.offset
+        start = self.code.getoffset()
         if self.code.matchany(['0b', '0B']) is None:
             return False
 
@@ -189,7 +228,7 @@ class Tokenizer:
             elif self.code.match('1'):
                 n = 2 * n + 1
             else:
-                return self.addtoken('integer', self.code.substring_index(start), n)
+                return self.addtoken('integer', self.code.substring_absolute(start), n)
 
     def tokenize_oct(self):
         """
@@ -199,7 +238,7 @@ class Tokenizer:
         Returns:
             (bool): True if an octal integer was tokenized, False otherwise
         """
-        start = self.code.offset
+        start = self.code.getoffset()
         if not self.code.match('0'):
             return False
 
@@ -209,7 +248,7 @@ class Tokenizer:
             if char is not None:
                 n = 8 * n + int(char)
             else:
-                return self.addtoken('integer', self.code.substring_index(start), n)
+                return self.addtoken('integer', self.code.substring_absolute(start), n)
 
     def tokenize_dec(self):
         """
@@ -219,7 +258,7 @@ class Tokenizer:
         Returns:
             (bool): True if a decimal integer was tokenized, False otherwise
         """
-        start = self.code.offset
+        start = self.code.getoffset()
         char = self.code.matchrange('0', '9')
         if char is None:
             return False
@@ -230,7 +269,7 @@ class Tokenizer:
             if char is not None:
                 n = 10 * n + int(char)
             else:
-                return self.addtoken('integer', self.code.substring_index(start), n)
+                return self.addtoken('integer', self.code.substring_absolute(start), n)
 
     def tokenize_hex(self):
         """
@@ -244,7 +283,7 @@ class Tokenizer:
         Raises:
             CompilerException: If the token starts with '0x' or '0X', but contains no hexadecimal digits directly after
         """
-        start = self.code.offset
+        start = self.code.getoffset()
         if self.code.matchany(['0x', '0X']) is None:
             return False
 
@@ -259,7 +298,7 @@ class Tokenizer:
                 n = 16 * n + int(self.code[0])
                 self.code.advance()
             except ValueError:
-                return self.addtoken('integer', self.code.substring_index(start), n)
+                return self.addtoken('integer', self.code.substring_absolute(start), n)
 
     def tokenize_char(self):
         """
@@ -276,20 +315,27 @@ class Tokenizer:
                     in the correct place (i.e. with one character between the 2 quotation marks)
                 - If the character inside the quotation marks is outside of the ASCII range 32 to 126 (inclusive)
         """
-        start = self.code.offset
+        start = self.code.getoffset()
         if not self.code.match("'"):
             return False
 
         if self.code[1] != "'":
-            raise CompilerException(CompilerException.SYNTAX, "Invalid character literal",
-                                    self.code[0] if self.code[0] == "'" else self.code[-1])
+            if self.code[0] == "'":
+                raise CompilerException(CompilerException.SYNTAX,
+                                        "Invalid character literal. Cannot have empty character literals",
+                                        self.code.substring_relative(-1))
+            raise CompilerException(CompilerException.SYNTAX,
+                                    "Invalid character literal. Character has no closing quotation mark",
+                                    self.code[0], offset=1)
 
         c = self.code[0].text
         self.code.advance(2)
         if 32 <= ord(c) <= 126:
-            return self.addtoken('integer', self.code.substring_index(start), ord(c))
+            return self.addtoken('integer', self.code.substring_absolute(start), ord(c))
         else:
-            raise CompilerException(CompilerException.SYNTAX, "Invalid character literal", self.code[-2])
+            raise CompilerException(CompilerException.SYNTAX,
+                                    "Invalid character literal. Only characters with an ASCII value between 32 and 126 "
+                                    "(inclusive) are allowed", self.code[-2])
 
 
 def tokenize(file):

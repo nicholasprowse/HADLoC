@@ -1,5 +1,5 @@
 from error import CompilerException
-from cstring import PositionObject
+# from cstring import CodeObject
 
 inst_formats = {'mov': ['register', 'register'], 'opd': ['register'], 'jmp': [], 'jgt': [], 'jeq': [], 'jlt': [],
                 'jge': [], 'jle': [], 'jne': [], 'jcs': [], 'jis': [], 'opi': ['register'], 'hlt': [],
@@ -88,11 +88,11 @@ class Parser:
         # Check if there are any labels or definitions that weren't used
         for label in self.labels:
             if label not in self.used_labels:
-                warnings.append(f"The label '{label}' on line {label.line} was never used")
+                warnings.append(f"The label '{label}' on line {label.line()+1} was never used")
 
         for definition in self.definitions:
             if definition not in self.used_definitions:
-                warnings.append(f"The constant '{definition}' on line {definition.line} was never used")
+                warnings.append(f"The constant '{definition}' on line {definition.line()+1} was never used")
 
         self.instructions.append(['hlt'])
 
@@ -121,20 +121,19 @@ class Parser:
             offset (int): the offset from the current token
 
         Returns:
-             (PositionObject) the value of the token offset by a given amount from the token currently being parsed, or
+             (CodeObject) the value of the token offset by a given amount from the token currently being parsed, or
              None if the given offset is not on the same line
         """
         if self.index + offset >= len(self.tokens[self.line]):
             return None
-        return self.tokens[self.line][self.index + offset][1].value
+        return self.tokens[self.line][self.index + offset][1]
 
     def addinstr(self, instr):
         """
         Helper function to add a new instruction at the same time as returning True
 
         Args:
-            instr (list): The instruction to be added. A list of strings or integers (can be String or PositionObjects
-                as well)
+            instr (list): The instruction to be added. A list of CodeObjects
 
         Returns:
             (bool): True
@@ -339,7 +338,7 @@ class Parser:
                 raise CompilerException(CompilerException.VALUE, "Integer literals must be in the range -32768 to 65535"
                                                                  " (inclusive)", value)
             self.index += 1
-            return value.value
+            return value
 
         if value == '(':
             self.index += 1
@@ -354,10 +353,9 @@ class Parser:
                                         self.value())
 
         if value is None:
-            prev = self.value(-1)
-            value = PositionObject(value, prev.line, prev.pos + len(prev) + 1)
-            raise CompilerException(CompilerException.SYNTAX, "Missing argument for '{}' instruction. Expected label, "
-                                                              "constant, or expression involving constants", value)
+            raise CompilerException(CompilerException.SYNTAX,
+                                    "Missing argument for '{}' instruction. Expected label, constant, or expression "
+                                    "involving constants", self.value(-1), offset=2)
         else:
             raise CompilerException(CompilerException.SYNTAX,
                                     "Unexpected token. Expected label, constant, or expression involving constants",
@@ -380,7 +378,7 @@ class Parser:
         if self.type() != 'keyword':
             return False
 
-        if str(self.value()) in inst_formats:
+        if self.value() in inst_formats:
             instruction = [self.value()]
             arguments = inst_formats[self.value()]
 
@@ -389,13 +387,12 @@ class Parser:
                     # If the argument exists, but is wrong, the error points to the wrong argument
                     # But of the argument doesn't exist, the pos of the previous argument is incremented by 2
                     # so the error will point to the poisition where the missing argument should be
-                    if self.value(i + 1) is not None:
-                        errtoken = self.value(i + 1)
-                    else:
-                        errtoken = self.value(i)
-                        errtoken.pos += 2
+                    if self.value(i + 1) is None:
+                        raise CompilerException(CompilerException.ARG,
+                                                "Expected {0} for argument {1} in '{2}' instruction"
+                                                .format(arguments[i], i + 1, self.value()), self.value(i), offset=2)
                     raise CompilerException(CompilerException.ARG, "Expected {0} for argument {1} in '{2}' instruction"
-                                            .format(arguments[i], i + 1, self.value()), errtoken)
+                                            .format(arguments[i], i + 1, self.value()), self.value(i + 1))
 
                 instruction.append(self.value(i + 1))
 
@@ -448,8 +445,8 @@ class Parser:
         Warning: This function will not advance past the token it uses as the argument (due to the way it is used in
         parse_lda).
         Args:
-            instr (string): string indicating the type of the load instruction. Can be either 'ldu' for load upper byte,
-                or 'ldb' for load lower byte
+            instr (str or CodeObject): string indicating the type of the load instruction. Can be either 'ldu' for load
+                upper byte, or 'ldb' for load lower byte
             tokentype (str): The type of the argument. For a valid load instruction to be written, this should be equal
             to 'integer' or 'identifier'. Otherwise a CompilerException will be raised
             value: the value of the argument. For a valid load instruction to be written, this should be an integer or
@@ -475,12 +472,6 @@ class Parser:
             return 1
 
         if tokentype == 'integer':
-            # If the integer is in a position object, we need to extract it. This is fine because there are no longer
-            # any errors that can occur with this instruction. We need to support both integers and PositionObjects,
-            # because the label encoder uses integers
-            if type(value) == PositionObject:
-                value = value.value
-
             # select the upper or lower 8 bits depending on the value of instr
             value = value & 0xFF if instr == 'ldb' else (value >> 8) & 0xFF
 
@@ -494,7 +485,7 @@ class Parser:
             # inserts. i.e. 'not L L' will be added to the end of the list, then the 'ldb' instruction will be inserted
             # before it
             self.instructions.insert(index, ['not', 'L', 'L'])
-            self.instructions.insert(index, ['ldb', ~value & 0xFF])
+            self.instructions.insert(index, [instr, ~value & 0xFF])
             return 2
 
         # We shouldn't ever reach this stage, becuase parse_constant_expression should have caught any errors

@@ -75,7 +75,9 @@ def instruction_value(instruction):
         return fixed[command]
 
     if command == 'ldb':
-        return 0x80 | instruction[1]
+        if type(instruction[1]) == int:
+            return instruction[1] | 0x80
+        return instruction[1].value | 0x80
 
     if command == 'mov':
         src, dst = instruction[1], instruction[2]

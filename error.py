@@ -1,5 +1,6 @@
 import sys
 import utils
+from cstring import CodeObject
 
 code = ['']
 
@@ -62,15 +63,23 @@ class CompilerException(HADLOCException):
     Args:
         error_type (int): The type of error
         msg (str): A message adviding the user what the error is
-        value (PositionObject): Object that caused the error. This must be a PositionObject, so that the location of
-            the error in the original file can be identified
+        value (PositionedString or CodeObject): The string within the code that caused the error. This must be a
+            PositionedString, so that the location of the error in the original file can be identified. A CodeObject
+            may also be passed in for the value argument, and the text attribute will be extracted from it.
+        offset (int): The amount to offset the error pointer from the token provided. If offset is zero, the error
+            pointer will point to the enitirety of value. If offset is positive, the pointer will point to the position
+                offset characters after the end of the provided value. If offset is negative, the pointer will display
+                before the first start of value
     """
     file_name = ''
 
-    def __init__(self, error_type, msg, value):
+    def __init__(self, error_type, msg, value, offset=0):
         self.error_type = error_type
         self.msg = msg
+        if type(value) == CodeObject:
+            value = value.text
         self.value = value
+        self.offset = offset
 
     def display(self):
         """
@@ -81,14 +90,20 @@ class CompilerException(HADLOCException):
         self.check_valid_error()
         error = self.ERROR_NAMES[self.error_type]
         printerror("{} Error in '{}', line {}"
-                   .format(error, utils.file_name(CompilerException.file_name), self.value.line))
-        printerror(code[self.value.line - 1].replace('\t', ' ' * 4))
+                   .format(error, utils.file_name(CompilerException.file_name), self.value.line() + 1))
+        printerror(code[self.value.line()].replace('\t', ' ' * 4))
         # count tabs before the character
         tabs = 0
-        for i in range(min(self.value.pos, len(code[self.value.line - 1]))):
-            if code[self.value.line - 1][i] == '\t':
+        for i in range(min(self.value.positions[0], len(code[self.value.line()]))):
+            if code[self.value.line()][i] == '\t':
                 tabs += 1
-        printerror(' ' * (self.value.pos + 3 * tabs), '^' * len(self.value), sep='')
+        if self.offset == 0:
+            printerror(' ' * (self.value.positions[0] + 3 * tabs), '^' * len(self.value), sep='')
+        elif self.offset > 0:
+            printerror(' ' * (self.value.positions[-1] + 3 * tabs + self.offset), '^', sep='')
+        else:
+            printerror(' ' * (self.value.positions[0] + 3 * tabs + self.offset), '^', sep='')
+
         printerror(error, " Error: ", self.msg, sep='')
         return True
 
