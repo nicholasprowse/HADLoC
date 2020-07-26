@@ -24,9 +24,9 @@ class Tokenizer:
     More information about what constututes each type of token can be fould in the documentation for the functions
     that tokenize them (e.g. Tokenizer.tokenize_label()).
 
-    The value of the token is stored as a String object for keywords, identifiers, registers and labels. Integer
-    values are stored as PositionObjects. This means that, if there is an error parsing, an error can be generated
-    showing the location of the error in the original code.
+    The value of the token is stored as a CodeObject. This CodeObject stores both the value of the token, and the
+    original text that created the token as a PositionedString. This means that if an error is created, we can determine
+    exactly where that token was in the code.
 
     Args:
         text (str): the raw text to be tokenized, obtained from the assembly file, stored as a string
@@ -35,8 +35,7 @@ class Tokenizer:
         code (LinedCode): The code that is being tokenized. This object stored the current location within the text
             that is currently being tokenized.
         tokens (list<list<tuple>>): A two dimensional list containing the tokens on each line. Each token is stored
-            in a tuple containing the type of the token as a string, and the value of the token as a String object or
-            a PositionObject.
+            in a tuple containing the type of the token as a string, and the value of the token as a CodeObject
 
     Raises:
         CompilerException: If there is a syntax error in the assembly code, a Compiler exception will be raised
@@ -132,8 +131,6 @@ class Tokenizer:
         An identifer is any other sequence of alphanumeric characters or underscores, where the first character is
         not a numeric character.
 
-        All three of these token types use a String object for the value
-
         Returns:
             (bool): True if a keyword, identifier or register token was created, False otherwise
         """
@@ -173,7 +170,6 @@ class Tokenizer:
     def tokenize_symbol(self):
         """
         Tokenizes a symbol. There are five symbols: '+', '-', '&', '|', '!', '(', ')' and ':'
-        The value of an operator is a String object containing the symbol
 
         Returns:
             bool: True if an operator was tokenized, False otherwise
@@ -188,7 +184,7 @@ class Tokenizer:
         Tokenizes an integer. There are 5 types of integer: binary, octal, decimal, hexadecimal and characters.
         This only tokenizes the integer (not the sign). If there is a minus sign, it will be tokenized as a symbol, and
         the parser will compute the negative of this value. Character integers evaluate to the ASCII value of the
-        character. The value of an integer token is a PositionObject whose value attribute is the integer represented
+        character. The value of an integer token is a CodeObject whose value attribute is the integer represented
         by the token.
 
         Returns:
@@ -350,17 +346,16 @@ def tokenize(file):
     More information about what constututes each type of token can be found in the documentation for the functions
     that tokenize them (e.g. Tokenizer.tokenize_label()).
 
-    The value of the token is stored as a String object for keywords, identifiers, registers and labels. Integer
-    values are stored as PositionObjects. This means that, if there is an error parsing, an error can be generated
-    showing the location of the error in the original code.
+    The value of the token is stored as a CodeObject. This CodeObject stores both the value of the token, and the
+    original text that created the token as a PositionedString. This means that if an error is created, we can determine
+    exactly where that token was in the code.
 
     Args:
         file (TextIOWrapper): An open file of the file to be tokenized. Must be in the mode 'r'.
 
     Returns:
         (list<list<tuple>>): A two dimensional list containing the tokens on each line. Each token is stored
-            in a tuple containing the type of the token as a string, and the value of the token as a String object or
-            a PositionObject.
+            in a tuple containing the type of the token as a string, and the value of the token as a CodeObject
     """
     code = file.read()
     error.code = code.splitlines()

@@ -98,7 +98,8 @@ class CompilerException(HADLOCException):
             if code[self.value.line()][i] == '\t':
                 tabs += 1
         if self.offset == 0:
-            printerror(' ' * (self.value.positions[0] + 3 * tabs), '^' * len(self.value), sep='')
+            printerror(' ' * (self.value.positions[0] + 3 * tabs),
+                       '^' * (self.value.positions[-1] - self.value.positions[0] + 1), sep='')
         elif self.offset > 0:
             printerror(' ' * (self.value.positions[-1] + 3 * tabs + self.offset), '^', sep='')
         else:

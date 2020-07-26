@@ -516,6 +516,7 @@ class CodeObject:
         """
         if type(other) == CodeObject:
             self.value &= other.value
+            self.text += other.text
         else:
             self.value &= other
         return self
@@ -536,6 +537,7 @@ class CodeObject:
         """
         if type(other) == CodeObject:
             self.value |= other.value
+            self.text += other.text
         else:
             self.value |= other
         return self
@@ -556,6 +558,7 @@ class CodeObject:
         """
         if type(other) == CodeObject:
             self.value += other.value
+            self.text += other.text
         else:
             self.value += other
         return self
@@ -576,6 +579,7 @@ class CodeObject:
         """
         if type(other) == CodeObject:
             self.value -= other.value
+            self.text += other.text
         else:
             self.value -= other
         return self
