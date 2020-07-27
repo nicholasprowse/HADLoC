@@ -90,7 +90,7 @@ class CompilerException(HADLOCException):
         self.check_valid_error()
         error = self.ERROR_NAMES[self.error_type]
         printerror("{} Error in '{}', line {}"
-                   .format(error, utils.file_name(CompilerException.file_name), self.value.line() + 1))
+                   .format(error, utils.get_file_name(CompilerException.file_name), self.value.line() + 1))
         printerror(code[self.value.line()].replace('\t', ' ' * 4))
         # count tabs before the character
         tabs = 0
@@ -118,5 +118,5 @@ class FileError(HADLOCException):
 
     def display(self):
         self.check_valid_error()
-        printerror("File Error in file: '{}'".format(utils.file_name(self.file_name)))
+        printerror("File Error in file: '{}'".format(utils.get_file_name(self.file_name)))
         printerror(self.msg)

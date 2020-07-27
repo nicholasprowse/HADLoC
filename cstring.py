@@ -21,17 +21,17 @@ class Code:
         relative to this offset
     """
 
-    def __init__(self, text, keepends=True):
+    def __init__(self, text):
         self.offset = 0
         if type(text) == PositionedString:
             self.string = text
         else:
-            self.string = PositionedString.create_string(text, keepends=keepends)
-            if not keepends:
-                # Add space at each line boundary, so that tokens cannot span multiple lines
-                for i in range(len(self.string) - 1, 0, -1):
-                    if self.string[i].line != self.string[i - 1].line:
-                        self.string.insert(i, ' ')
+            self.string = PositionedString.create_string(text, keepends=False)
+            # Add a new line character to the end of each line. The reason we removed the new lines above, is so that
+            # all new line characters are now '\n' rather than '\r' or '\r\n'
+            for i in range(len(self.string) - 1, 0, -1):
+                if self.string[i].line() != self.string[i - 1].line():
+                    self.string = self.string.insert(i, '\n'*(self.string[i].line() - self.string[i - 1].line()))
 
     def substring_length(self, length):
         """
@@ -627,7 +627,9 @@ class CodeObject:
         return str(self.value)
 
     def __repr__(self):
-        return "(" + str(self.value) + ", text=" + str(self.text) + ')'
+        if self.value == self.text:
+            return repr(self.value)
+        return "(" + repr(self.value) + ", text=" + repr(self.text) + ')'
 
     def __len__(self):
         """Returns the length of the value attribute"""
@@ -835,4 +837,4 @@ class PositionedString:
         return self.text
 
     def __repr__(self):
-        return str(self)
+        return f"'{str(self)}'"

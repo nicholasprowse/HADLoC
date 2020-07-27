@@ -15,7 +15,7 @@ def extension(file_name):
     return file_name[len(file_name) - file_name[::-1].find('.'):].lower()
 
 
-def file_name(file):
+def get_file_name(file):
     """
     Returns the name of a given file. This is just the name, not including the path. The file argument can either be a
     file object or a string representing the path to the file

@@ -10,8 +10,9 @@ import serial
 
 import writer
 from assembler.assembler import assemble
+from compiler.compiler import jcompile
 from error import HADLOCException
-from utils import file_name
+from utils import get_file_name
 
 # TODO Serial read can raise a SerialError if the connection is lost midread. Should catch these errors
 
@@ -126,7 +127,7 @@ def execute_read(args):
 
 def execute_assemble(args):
     warnings, files = assemble(args.file)
-    print("Successfully Assembled '{}' with {} warning{}".format(file_name(args.file), len(warnings),
+    print("Successfully Assembled '{}' with {} warning{}".format(get_file_name(args.file), len(warnings),
                                                                  '' if len(warnings) == 1 else 's'), flush=True)
     for warning in warnings:
         print(warning)
@@ -136,7 +137,7 @@ def execute_assemble(args):
             os.remove(files[i])
     if args.l:
         writer.write_data(get_serial_from_args(args), open(files[0], 'r'))
-        print("Successfully Loaded '{}' onto EEPROM".format(file_name(files[0])))
+        print("Successfully Loaded '{}' onto EEPROM".format(get_file_name(files[0])))
 
 
 def find_serialport_auto():
@@ -315,9 +316,9 @@ def main():
 
 
 def test():
-    f = open("/Users/nicholasprowse/Documents/Programming/HADLoC Programs/test/test.hdc")
+    f = open("/Users/nicholasprowse/Documents/Programming/HADLoC Programs/J test/test.j")
     try:
-        assemble(f)
+        jcompile(f)
     except HADLOCException as he:
         he.display()
     f.close()
