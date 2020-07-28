@@ -1,15 +1,29 @@
 import os
 import error
+from enum import Enum
 
 from error import CompilerException
 from cstring import Code, CodeObject, PositionedString
 
-keywords = ['public', 'private', 'class', 'static', 'byte', 'char', 'boolean', 'constructor', 'true', 'false', 'null']
+keywords = ['public', 'private', 'class', 'static', 'byte', 'char', 'boolean', 'constructor', 'true', 'false', 'null',
+            'import']
 
 operators = ['+', '-', '*', '/', '?', ':', '<<', '>>', '=', '==', '!=', '-=', '+=', '*=', '/=', '%', '%=', '!', '&',
              '|', '&=', '|=', '<', '>', '<=', '>=', '^']
 
 separators = ['(', ')', '{', '}', '[', ']', '.', ',', ';', '...']
+
+
+class Token(Enum):
+    """Class to contain all the token types that can be used"""
+    identifier = 0
+    keyword = 1
+    operator = 2
+    separator = 3
+    string = 4
+    character = 5
+    integer = 6
+    float = 7
 
 
 class Tokenizer:
@@ -64,8 +78,7 @@ class Tokenizer:
         in a CodeObject. If value is not provided, it will be set to the value of text.
 
         Args:
-            tokentype (str): The type of the token.
-                Must be one of 'keyword', 'identifier', 'register', 'label', 'integer'
+            tokentype (Token): The type of the token.
             text (PositionedString): The string from the code that generated the token
             value: The value of the token. This represents the value of the token. For example, if the token is an
                 integer, value would be an int, that is the value of the token. If value is not passed, it gets set to
@@ -105,14 +118,14 @@ class Tokenizer:
     def tokenize_keyword(self):
         """
         Tokenizes a keyword. A keyword is any of the following words
-            public, private, class, static, byte, char, boolean, constructor, true, false, null
+            public, private, class, static, byte, char, boolean, constructor, true, false, null, import
 
         Returns:
             bool: True if a keyword was tokenized, False otherwise
         """
         word = self.code.matchany(keywords)
         if word is not None:
-            return self.addtoken('keyword', word)
+            return self.addtoken(Token.keyword, word)
         return False
 
     def tokenize_identifier(self):
@@ -134,7 +147,7 @@ class Tokenizer:
                 break
 
         self.code.advance(len(word))
-        return self.addtoken('identifier', word)
+        return self.addtoken(Token.identifier, word)
 
     def tokenize_operator(self):
         """
@@ -146,7 +159,7 @@ class Tokenizer:
         """
         operator = self.code.matchany(operators)
         if operator is not None:
-            return self.addtoken('operator', operator)
+            return self.addtoken(Token.operator, operator)
         return False
 
     def tokenize_separator(self):
@@ -159,7 +172,7 @@ class Tokenizer:
         """
         separator = self.code.matchany(separators)
         if separator is not None:
-            return self.addtoken('separator', separator)
+            return self.addtoken(Token.separator, separator)
         return False
 
     def tokenize_literal(self):
@@ -243,7 +256,7 @@ class Tokenizer:
             else:
                 exponentdigits = '0'
 
-        return self.addtoken('float', self.code.substring_absolute(start),
+        return self.addtoken(Token.float, self.code.substring_absolute(start),
                              (integerdigits, fractionaldigits, exponentsign, exponentdigits))
 
     def tokenize_int(self):
@@ -290,7 +303,7 @@ class Tokenizer:
             elif self.code.match('1'):
                 n = 2 * n + 1
             else:
-                return self.addtoken('integer', self.code.substring_absolute(start), n)
+                return self.addtoken(Token.integer, self.code.substring_absolute(start), n)
 
     def tokenize_oct(self):
         """
@@ -310,7 +323,7 @@ class Tokenizer:
             if char is not None:
                 n = 8 * n + int(char)
             else:
-                return self.addtoken('integer', self.code.substring_absolute(start), n)
+                return self.addtoken(Token.integer, self.code.substring_absolute(start), n)
 
     def tokenize_dec(self):
         """
@@ -331,7 +344,7 @@ class Tokenizer:
             if char is not None:
                 n = 10 * n + int(char)
             else:
-                return self.addtoken('integer', self.code.substring_absolute(start), n)
+                return self.addtoken(Token.integer, self.code.substring_absolute(start), n)
 
     def tokenize_hex(self):
         """
@@ -360,7 +373,7 @@ class Tokenizer:
                 n = 16 * n + int(self.code[0])
                 self.code.advance()
             except ValueError:
-                return self.addtoken('integer', self.code.substring_absolute(start), n)
+                return self.addtoken(Token.integer, self.code.substring_absolute(start), n)
 
     def tokenize_char(self):
         """
@@ -404,7 +417,7 @@ class Tokenizer:
                                         "126 (~) can be used in character literals", self.code[-1])
 
         if self.code.match("'"):
-            return self.addtoken('character', self.code.substring_absolute(start), character)
+            return self.addtoken(Token.character, self.code.substring_absolute(start), character)
 
         if character == "'":
             raise CompilerException(CompilerException.SYNTAX,
@@ -465,7 +478,7 @@ class Tokenizer:
                                             "and 126 (~) can be used in string literals", self.code[-1])
 
         self.code.advance()
-        return self.addtoken('string', self.code.substring_absolute(start), string)
+        return self.addtoken(Token.string, self.code.substring_absolute(start), string)
 
 
 def tokenize(file):

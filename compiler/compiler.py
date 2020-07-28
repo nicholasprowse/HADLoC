@@ -1,4 +1,5 @@
 from .tokenizer import tokenize
+from .parser import Parser
 from utils import verify_file
 
 
@@ -14,4 +15,5 @@ def jcompile(file):
     """
     file_name = verify_file(file, 'j', "File to compile must have a '.j' extension")
     tokens = tokenize(file)
-    print(tokens)
+    parser = Parser(tokens)
+    parser.ast.print_tree()
