@@ -70,13 +70,13 @@ class Tokenizer:
             text (PositionedString): The string from the code that generated the token
             value: The value of the token. This represents the value of the token. For example, if the token is an
                 integer, value would be an int, that is the value of the token. If value is not passed, it gets set to
-                text
+                text. This must be an int, or str type
 
         Returns:
             (bool): True
         """
         if value is None:
-            value = text
+            value = text.text
         self.tokens[-1].append((tokentype, CodeObject(value, text)))
         return True
 
@@ -319,10 +319,10 @@ class Tokenizer:
             if self.code[0] == "'":
                 raise CompilerException(CompilerException.SYNTAX,
                                         "Invalid character literal. Cannot have empty character literals",
-                                        self.code.substring_relative(-1))
+                                        self.code.substring_relative(-1, 1))
             raise CompilerException(CompilerException.SYNTAX,
                                     "Invalid character literal. Character has no closing quotation mark",
-                                    self.code[0], offset=1)
+                                    self.code.substring_relative(-1, 1))
 
         c = self.code[0].text
         self.code.advance(2)

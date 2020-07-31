@@ -124,24 +124,24 @@ def find_lengths(labels, finished, instructions):
             # we need to revert back to their original values)
             labels1, finished1 = find_lengths(labels.copy(), finished.copy(), instructions)
 
-            # boolean value determining is this assumption is consistent (i.e. is length is one, we need the eighth
+            # boolean value determining if this assumption is consistent (i.e. is length is one, we need the eighth
             # bit to be zero)
-            consistent1 = labels1[label]['min'] & 0x80 == labels1[label]['max'] & 0x80 == 0
+            consistent1 = labels1[label]['min'] & 0x7F80 == labels1[label]['max'] & 0x7F80 == 0
 
             # Do the same, but this time assume that the length is 2
             pos['len'] = 2
             labels2, finished2 = find_lengths(labels.copy(), finished.copy(), instructions)
-            consistent2 = labels2[label]['min'] & 0x80 == labels2[label]['max'] & 0x80 == 1
+            consistent2 = labels2[label]['min'] & 0x7F80 == labels2[label]['max'] & 0x7F80 == 1
 
             # If both assumptions are consistent, return the one that has more labels resolved.
             if consistent1 and consistent2:
                 if len(finished1) < len(finished2):
                     return labels2, finished2
-                return labels1, finished2
+                return labels1, finished1
 
             # Otherwise, if one assumption is consistent, we return that assumption
             if consistent1:
-                return labels1, finished2
+                return labels1, finished1
             if consistent2:
                 return labels2, finished2
 

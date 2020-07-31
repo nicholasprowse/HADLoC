@@ -422,6 +422,7 @@ class CodeObject:
     """
 
     def __init__(self, value, text):
+        assert type(value) == str or type(value) == int or type(value) == float
         self.value = value
         self.text = text
 

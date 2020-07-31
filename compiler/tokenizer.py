@@ -88,7 +88,7 @@ class Tokenizer:
             (bool): True
         """
         if value is None:
-            value = text
+            value = text.text
         self.tokens.append((tokentype, CodeObject(value, text)))
         return True
 
@@ -425,7 +425,7 @@ class Tokenizer:
                                     self.code.substring_relative(-2))
         raise CompilerException(CompilerException.SYNTAX,
                                 "Invalid character literal. Character has no closing quotation mark",
-                                self.code[0], offset=1)
+                                self.code.substring_relative(-2))
 
     def tokenize_string(self):
         """

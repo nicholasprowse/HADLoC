@@ -66,20 +66,15 @@ class CompilerException(HADLOCException):
         value (PositionedString or CodeObject): The string within the code that caused the error. This must be a
             PositionedString, so that the location of the error in the original file can be identified. A CodeObject
             may also be passed in for the value argument, and the text attribute will be extracted from it.
-        offset (int): The amount to offset the error pointer from the token provided. If offset is zero, the error
-            pointer will point to the enitirety of value. If offset is positive, the pointer will point to the position
-                offset characters after the end of the provided value. If offset is negative, the pointer will display
-                before the first start of value
     """
     file_name = ''
 
-    def __init__(self, error_type, msg, value, offset=0):
+    def __init__(self, error_type, msg, value):
         self.error_type = error_type
         self.msg = msg
         if type(value) == CodeObject:
             value = value.text
         self.value = value
-        self.offset = offset
 
     def display(self):
         """
@@ -97,13 +92,8 @@ class CompilerException(HADLOCException):
         for i in range(min(self.value.positions[0], len(code[self.value.line()]))):
             if code[self.value.line()][i] == '\t':
                 tabs += 1
-        if self.offset == 0:
-            printerror(' ' * (self.value.positions[0] + 3 * tabs),
-                       '^' * (self.value.positions[-1] - self.value.positions[0] + 1), sep='')
-        elif self.offset > 0:
-            printerror(' ' * (self.value.positions[-1] + 3 * tabs + self.offset), '^', sep='')
-        else:
-            printerror(' ' * (self.value.positions[0] + 3 * tabs + self.offset), '^', sep='')
+        printerror(' ' * (self.value.positions[0] + 3 * tabs),
+                   '^' * (self.value.positions[-1] - self.value.positions[0] + 1), sep='')
 
         printerror(error, " Error: ", self.msg, sep='')
         return True

@@ -324,5 +324,14 @@ def test():
     f.close()
 
 
+def assemble_test():
+    f = open("/Users/nicholasprowse/Documents/Programming/HADLoC Programs/test/test.hdc")
+    try:
+        assemble(f)
+    except HADLOCException as he:
+        he.display()
+    f.close()
+
+
 if __name__ == "__main__":
     test()

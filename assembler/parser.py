@@ -362,8 +362,8 @@ class Parser:
 
         if value is None:
             raise CompilerException(CompilerException.SYNTAX,
-                                    "Missing argument for '{}' instruction. Expected label, constant, or expression "
-                                    "involving constants", self.value(-1), offset=2)
+                                    "Missing value for '{}' instruction. Expected label, constant, or expression "
+                                    "involving constants", self.value(-1))
         else:
             raise CompilerException(CompilerException.SYNTAX,
                                     "Unexpected token. Expected label, constant, or expression involving constants",
@@ -398,7 +398,7 @@ class Parser:
                     if self.value(i + 1) is None:
                         raise CompilerException(CompilerException.ARG,
                                                 "Expected {0} for argument {1} in '{2}' instruction"
-                                                .format(arguments[i], i + 1, self.value()), self.value(i), offset=2)
+                                                .format(arguments[i], i + 1, self.value()), self.value(i))
                     raise CompilerException(CompilerException.ARG, "Expected {0} for argument {1} in '{2}' instruction"
                                             .format(arguments[i], i + 1, self.value()), self.value(i + 1))
 
