@@ -8,7 +8,7 @@ from cstring import Code, CodeObject, PositionedString
 keywords = ['public', 'private', 'class', 'static', 'byte', 'char', 'bool', 'constructor', 'true', 'false', 'null',
             'import', 'void']
 
-operators = ['->', '+', '-', '*', '/', '?', ':', '<<', '=', '==', '!=', '-=', '+=', '*=', '/=', '%', '%=', '!', '&',
+operators = ['...', '->', '+', '-', '*', '/', '?', ':', '<<', '=', '==', '!=', '-=', '+=', '*=', '/=', '%', '%=', '!', '&',
              '|', '&=', '|=', '<', '>', '<=', '>=', '^']
 
 separators = ['(', ')', '{', '}', '[', ']', '.', ',', ';', '...']
