@@ -123,22 +123,30 @@ class Parser:
         to the abstract syntax tree with the given parent, under the given name. All parsing should be done by passing
         the function that parses an element into this function, as it automatically deals with restoring the value of
         self.index if parsing fails, and automatically deals with adding the node to the tree.
+        If the function passed in raises a CompilerException, it will be caught, self.index will be restored, and the
+        Exception will be reraised, so that if a function wishes to catch exceptions, self.index will still remain
+        unchanged
 
         Args:
-            function (function): A function that parses the required grammar element. This function must return the
-                ASTNode representing the grammar it parsed if its parsing was successful. If parsing is unsuccessful,
-                this function should return None. In this case, the function does not need to restore the value of the
-                index, as this function deals with that. Can raise a CompilerException if the code is found to contain
-                errors
-            parent (ASTNode): The node that is the parent of the node that this function will create. This function
-                will add its node to this parent as a child
-            name (str): The name with which this child should use when it adds itself to its parent
+            function (function or method): A function that parses the required grammar element. This function must
+                return the ASTNode representing the grammar it parsed if its parsing was successful. If parsing is
+                unsuccessful, this function should return None. In this case, the function does not need to restore the
+                value of the index, as this function deals with that. Can raise a CompilerException if the code is found
+                to contain errors
+            parent (ASTNode): The node that is the parent of the node that this function will create. This
+                function will add its node to this parent as a child
+            name (str): The name with which this child should use
+                when it adds itself to its parent
 
         Returns:
             bool: True if the given function successfully parsed its grammar element, False otherwise
         """
         saved = self.index
-        node = function()
+        try:
+            node = function()
+        except CompilerException as ce:
+            self.index = saved
+            raise ce
         if node is None:
             self.index = saved
             return False
@@ -176,17 +184,15 @@ class Parser:
         """
         Parses a class declaration. A class declaration is defined as follows:
 
-        **ClassDeclaration**  ::=  PrivacyModifier? 'class' Identifier ClassBody
-
-        **PrivacyModifier**   ::=  'private' | 'public'
-
-        **ClassBody**         ::=  '{' (FieldDeclaration | MethodDeclaration | Constructor)* '}'
+        | **ClassDeclaration**  ::=  PrivacyModifier? 'class' Identifier ClassBody
+        | **PrivacyModifier**   ::=  'private' | 'public'
+        | **ClassBody**         ::=  '{' (FieldDeclaration | FunctionDeclaration | Constructor)* '}'
 
         A class declaration has 5 children:
             * PrivacyModifier - A CodeObject that is one of 'private', 'public' or None
             * Name - CodeObject that is a string containing the name of the class
             * FieldDeclarations - List of ASTNodes
-            * MethodDeclarations - List of ASTNodes
+            * FunctionDeclarations - List of ASTNodes
             * Constructors - List of ASTNodes
 
         Returns:
@@ -207,7 +213,7 @@ class Parser:
             raise CompilerException(CompilerException.SYNTAX, "Expected opening brace, '{', after a class declaration",
                                     self.value(-1))
 
-        while self.parse(self.method_declaration, node, 'Methods') or \
+        while self.parse(self.function_declaration, node, 'Functions') or \
                 self.parse(self.constructor_declaration, node, 'constructors') or \
                 self.parse(self.field_declaration, node, 'Fields'):
             pass
@@ -219,32 +225,29 @@ class Parser:
 
         return node
 
-    # TODO add generics to methods
-    def method_declaration(self):
+    # TODO add generics to functions
+    def function_declaration(self):
         """
-        Parses a method declaration, defined as follows
+        Parses a function declaration, defined as follows
 
-        | **MethodDeclaration**   ::=  MethodHeader MethodBody
-        | **MethodHeader**        ::=  PrivacyModifier? 'static'? Identifier '(' ParameterList? ')' ('->' ReturnType)?
+        | **FunctionDeclaration**   ::=  FunctionHeader FunctionBody
+        | **FunctionHeader**        ::=  PrivacyModifier? 'static'? Identifier '(' ParameterList? ')' ('->' ReturnType)?
         | **PrivacyModifier**     ::=  'private' | 'public'
         | **ReturnType**          ::=  Type | 'void'
-        | **ParameterList**       ::=  Type Identifier (',' Type Identifier)*
-        | **MethodBody**          ::=  '{' Statement* '}'
+        | **FunctionBody**          ::=  '{' Statement* '}'
 
-        A method declaration has the following children
+        A function declaration has the following children
             - PrivacyModifier - A CodeObject. May be None
             - Static - A CodeObject. May be None
-            - Name - A CodeObject containing the name of the method
-            - ParameterNames - List of CodeObjects, each of which is the identifier if one of the method parameters
-            - ParameterTypes - List of ASTNodes, each of which is a Type, that is the type of each of the method
-              parameters. These are in the same order as the parameters in ParameterNames.
+            - Name - A CodeObject containing the name of the function
+            - Parameters - ASTNode containing a ParameterList node. May be None if there are no parameters
             - ReturnType - An ASTNode of type Type, or a CodeObject is the return type is void. May be None
             - Statements - List of ASTNodes, each of which is a Statement
 
         Returns:
-            ASTNode: The node generated by parsing the method declaration, or None if parsing failed
+            ASTNode: The node generated by parsing the function declaration, or None if parsing failed
         """
-        node = ASTNode('MethodDeclaration', {'Statements': [], 'ParameterList': None})
+        node = ASTNode('FunctionDeclaration', {'Statements': [], 'Parameters': None})
         self.add_optional(node, ['private', 'public', 'protected'], 'PrivacyModifier')
         self.add_optional(node, ['static'], 'Static')
 
@@ -257,65 +260,85 @@ class Parser:
         if not self.match('('):
             return None
 
-        self.parse(self.parameter_list, node, 'ParameterList')
+        self.parse(self.parameter_list, node, 'Parameters')
 
         if not self.match(')'):
             raise CompilerException(CompilerException.SYNTAX,
-                                    "Expected closing bracket, ')', after method arguments", self.value(-1))
+                                    "Expected closing bracket, ')', after function arguments", self.value(-1))
 
         if self.match('->'):
             if self.match('void'):
                 node.addchild('ReturnType', self.value(-1))
             elif not self.parse(self.type, node, 'ReturnType'):
                 raise CompilerException(CompilerException.SYNTAX,
-                                        "Expected return type after return arrow in method declaration", self.value(-1))
+                                        "Expected return type after return arrow in function declaration",
+                                        self.value(-1))
 
         else:
             node.addchild('ReturnType', None)
 
         if not self.match('{'):
             raise CompilerException(CompilerException.SYNTAX,
-                                    "Expected opening brace, '{', after method header", self.value(-1))
+                                    "Expected opening brace, '{', after function header", self.value(-1))
 
         while self.parse(self.statement, node, 'Statements'):
             pass
 
         if not self.match('}'):
             raise CompilerException(CompilerException.SYNTAX,
-                                    "Expected closing brace, '}', after method body", self.value(-1))
+                                    "Expected closing brace, '}', after function body", self.value(-1))
 
         return node
 
-    def parameter_list(self):
+    def parameter_list(self, inferred=False):
         """
-        Parses a parameter list, used in method declarations, and anonymous functions
-        | **ParameterList**     ::=  (Parameter (',' Parameter)* (',' VariadicParameter)?) | VariadicParameter
-        | **Parameter**         ::=  Type Identifier ('=' VariableInitializer)?
-        | **VariadicParameter   ::=  Type '...' Identifier
+        Parses a parameter list, used in function declarations, and anonymous functions. This function can parse both
+        inferred type parameter lists and explicit type parameter lists, determined by the inferred argument. Inferred
+        parameters cannot have variadic parameters.
+
+        | **ExplicitParameterList**     ::=  (Parameter (',' Parameter)* (',' VariadicParameter)?) | VariadicParameter
+        | **InferredParameterList**     ::=  (InferredParameter (',' InferredParameter)*
+        | **Parameter**                 ::=  Type Identifier ('=' VariableInitializer)?
+        | **InferredParameter**         ::=  Identifier ('=' VariableInitializer)?
+        | **VariadicParameter           ::=  Type '...' Identifier
+        
+        Note: it is not included in the grammar, but it is illegal to have a parameter without a default value after
+        a parameter that does.
 
         Creates a node with 3 children
-            - ParameterTypes - List of ASTNodes containing the type of each of the parameters
+            - ParameterTypes - List of ASTNodes containing the type of each of the parameters. If parsing inferred
+              types, this list will always be empty
             - ParameterNames - List of CodeObjects containing the names of each of the parameters
             - DefaultValues - List of ASTNodes containing Expressions, which are the defualt values of the parameters.
-              For parameters without default values, None will be used in this list
+              When some parameters don't have default values, the values in this list correspond to the parameters at 
+              the end of the parameter lists (not including the variadic parameter)
             - VariadicName - CodeObject containing the name of the variadic parameter, or None if there is no variadic
               parameter
             - VariadicType - ASTNode containing a Type, which is the type of the variadic parameter, or None if there
               is no variadic parameter
 
+        Args:
+            inferred (bool): If True parses inferred type parameters, otherwise parses explicit type parameters.
+                Defaults to False, meaning explicit type parameters are parsed by default.
         Returns:
             ASTNode: The node generated by parsing the parameter list, or None if parsing failed
         """
         node = ASTNode("ParameterList", {'ParameterNames': [], 'ParameterTypes': [], 'DefaultValues': [],
                                          'VariadicName': None, 'VariadicType': None})
-        if not self.parse(self.type, node, 'ParameterTypes'):
-            return None
+        variadic = False
+        if not inferred:
+            if not self.parse(self.type, node, 'ParameterTypes'):
+                return None
 
-        variadic = self.match('...')
+            variadic = self.match('...')
 
         if not self.get_type() == Token.identifier:
-            raise CompilerException(CompilerException.SYNTAX,
-                                    "Expected parameter name after parameter type in method header", self.value(-1))
+            if not inferred:
+                raise CompilerException(CompilerException.SYNTAX, "Expected parameter name after parameter type in "
+                                                                  "function header", self.value(-1))
+            else:
+                return None
+
         node.addchild('VariadicName' if variadic else 'ParameterNames', self.value())
         if variadic:
             node.addchild('VariadicType', node['ParameterTypes'][-1])
@@ -327,20 +350,25 @@ class Parser:
                                         "Cannot have default values for variadic parameters", self.value(-1))
             if not self.parse(self.variable_initializer, node, 'DefaultValues'):
                 raise CompilerException(CompilerException.SYNTAX,
-                                        "Expected expression after '=' in method parameter", self.value(-1))
+                                        "Expected expression after '=' in function parameter", self.value(-1))
 
         while self.match(','):
             if variadic:
                 raise CompilerException(CompilerException.SYNTAX,
-                                        "Variadic parameter must be the last parameter in a method", self.value(-1))
-            if not self.parse(self.type, node, 'ParameterTypes'):
-                raise CompilerException(CompilerException.SYNTAX, "Expected method parameter type after comma in "
-                                                                  "method declaration", self.value(-1))
-            variadic = self.match('...')
+                                        "Variadic parameter must be the last parameter in a function", self.value(-1))
+            if not inferred:
+                if not self.parse(self.type, node, 'ParameterTypes'):
+                    raise CompilerException(CompilerException.SYNTAX, "Expected function parameter type after comma in "
+                                                                      "function declaration", self.value(-1))
+                variadic = self.match('...')
 
             if not self.get_type() == Token.identifier:
-                raise CompilerException(CompilerException.SYNTAX,
-                                        "Expected parameter name after parameter type in method header", self.value(-1))
+                if inferred:
+                    raise CompilerException(CompilerException.SYNTAX,
+                                            "Expected parameter name after comma in function header", self.value(-1))
+                else:
+                    raise CompilerException(CompilerException.SYNTAX, "Expected parameter name after parameter type in "
+                                                                      "function header", self.value(-1))
             node.addchild('VariadicName' if variadic else 'ParameterNames', self.value())
             if variadic:
                 node.addchild('VariadicType', node['ParameterTypes'][-1])
@@ -352,12 +380,16 @@ class Parser:
                                             "Cannot have default values for variadic parameters", self.value(-1))
                 if not self.parse(self.variable_initializer, node, 'DefaultValues'):
                     raise CompilerException(CompilerException.SYNTAX,
-                                            "Expected expression after '=' in method parameter", self.value(-1))
+                                            "Expected expression after '=' in function parameter", self.value(-1))
+            elif len(node['DefaultValues']) > 0 and not variadic:
+                raise CompilerException(CompilerException.SYNTAX, "Cannot have positional parameters after "
+                                                                  "parameters with a default value", self.value(-1))
+
         return node
 
     def constructor_declaration(self):
         """
-        Parses a constructor declaration. A constructor declaration is very similar to a method declaration, except it
+        Parses a constructor declaration. A constructor declaration is very similar to a function declaration, except it
         cannot be static, it has no return type, and its name must be 'constructor'. Also, in the constructor body, two
         new statements are allowed, one of which can occur as the fist statement in the body, which are parsed under
         the name ConstructorInvocation
@@ -366,12 +398,12 @@ class Parser:
         | **ConstructorHeader**        ::=  PrivacyModifier? 'constructor' '(' ParameterList? ')'
         | **PrivacyModifier**          ::=  'private' | 'public'
         | **ParameterList**            ::=  Type Identifier (',' Type Identifier)*
-        | **MethodBody**               ::=  '{' ConstructorInvocation Statement* '}'
+        | **FunctionBody**               ::=  '{' ConstructorInvocation Statement* '}'
 
-        A method declaration has the following children
+        A function declaration has the following children
             - PrivacyModifier - A CodeObject. May be None
-            - ParameterNames - List of CodeObjects, each of which is the identifier if one of the method parameters
-            - ParameterTypes - List of ASTNodes, each of which is a Type, that is the type of each of the method
+            - ParameterNames - List of CodeObjects, each of which is the identifier if one of the function parameters
+            - ParameterTypes - List of ASTNodes, each of which is a Type, that is the type of each of the function
               parameters. These are in the same order as the parameters in ParameterNames.
             - ConstructorInvocation - ASTNode containing a ConstructorInvocation. May be None
             - Statements - List of ASTNodes, each of which is a Statement
@@ -387,17 +419,17 @@ class Parser:
 
         if not self.match('('):
             raise CompilerException(CompilerException.SYNTAX,
-                                    "Expected opening bracket, '(', after method name", self.value(-1))
+                                    "Expected opening bracket, '(', after function name", self.value(-1))
 
         self.parse(self.parameter_list, node, 'ParameterList')
 
         if not self.match(')'):
             raise CompilerException(CompilerException.SYNTAX,
-                                    "Expected closing bracket, ')', after method arguments", self.value(-1))
+                                    "Expected closing bracket, ')', after function arguments", self.value(-1))
 
         if not self.match('{'):
             raise CompilerException(CompilerException.SYNTAX,
-                                    "Expected opening brace, '{', after method header", self.value(-1))
+                                    "Expected opening brace, '{', after function header", self.value(-1))
 
         if not self.parse(self.constructor_invocation, node, 'ConstructorInvocation'):
             node.addchild('ConstructorInvocation', None)
@@ -406,7 +438,7 @@ class Parser:
 
         if not self.match('}'):
             raise CompilerException(CompilerException.SYNTAX,
-                                    "Expected closing bracket, '}', after method body", self.value(-1))
+                                    "Expected closing bracket, '}', after function body", self.value(-1))
 
         return node
 
@@ -445,6 +477,8 @@ class Parser:
             if not self.parse(self.variable_initializer, node, 'VariableInitializers'):
                 raise CompilerException(CompilerException.SYNTAX,
                                         "Expected variable initializer after '=' in field declaration", self.value(-1))
+        else:
+            node.addchild('VariableInitializers', None)
 
         while self.match(','):
             if not self.get_type() == Token.identifier:
@@ -459,6 +493,8 @@ class Parser:
                     raise CompilerException(CompilerException.SYNTAX,
                                             "Expected variable initializer after '=' in field declaration",
                                             self.value(-1))
+            else:
+                node.addchild('VariableInitializers', None)
 
         if not self.match(';'):
             raise CompilerException(CompilerException.SYNTAX, "Expected ';' after field declaration", self.value(-1))
@@ -468,12 +504,15 @@ class Parser:
     def variable_initializer(self):
         """
         Variable initializer is any expression that can be used during variable creation. It is any normal expression,
-        or an array initializer
+        an array initializer or an anonymous function. The reason array initializers and anonymous functions are not
+        included in expressions is because their type is not always able to be determined. Thus, we put them in a
+        seperate construction so we can ensure they are only used in places where their type can be inferred. This
+        includes variable assignment and initializers, and arguments for functions.
 
-        | **VariableInitializer**   ::= ArrayInitializer | Expression
+        | **VariableInitializer**   ::= ArrayInitializer | AnonymousFunction | Expression
 
         Note: this does not generate its own node. Instead it returns the node created by the
-        ArrayInitializer/Expression parsing
+        ArrayInitializer/AnonymousFunction/Expression parsing
 
         Returns:
             ASTNode: The node generated by parsing the variable initializer, or None if parsing failed
@@ -481,6 +520,8 @@ class Parser:
         node = ASTNode('VariableInitializer')
         if self.parse(self.array_initializer, node, 'ArrayInitializer'):
             return node['ArrayInitializer']
+        if self.parse(self.anonymous_function, node, 'AnonymousFunction'):
+            return node['AnonymousFunction']
         if self.parse(self.expression, node, 'Expression'):
             return node['Expression']
         return None
@@ -547,7 +588,232 @@ class Parser:
 
         return node
 
+    def anonymous_function(self):
+        """
+        Parses an anonymous function, defined as follows
+
+        | **AnonymousFunction**     ::=  LambdaParameters '->' LambdaBody
+        | **LambdaParameters**      ::=  ('(' ParameterList? ')') | ('(' InferredParameterList? ')') | Identifier
+        | **LambdaBody**            ::=  Expression | ('{' Statement* '}')
+
+        Creates a node with 3 children
+            - Parameters - ASTNode or CodeObject. If it is a node, it is a ParameterList containing the function
+              parameters. If it is a CodeObject, it is an identifier of the single parameter. May also be None if there
+              are no parameters
+            - Expression - If a single expression is used as the body, then this contains the Expression ASTNode.
+              Otherwise, this will be None
+            - Statements - If a block is used as the function body, then this contains a list of ASTNodes containing
+              Statement nodes. This is never None, so you must check if Expression is None or not, to determine if a
+              code block was used
+
+        Returns:
+            ASTNode: The node generated by parsing the anonymous function, or None if parsing failed
+        """
+        node = ASTNode('AnonymousFunction', {'Expression': None, 'Statements': [], 'Parameters': None})
+        if self.get_type() == Token.identifier:
+            node.addchild('Parameters', self.value())
+            self.index += 1
+            if not self.match('->'):
+                return None
+        else:
+            if not self.match('('):
+                return None
+
+            # Parameter list parsing can raise errors if the list is has inferred types, so we must catch the errors
+            try:
+                success = self.parse(self.parameter_list, node, 'Parameters')
+            except CompilerException:
+                success = False
+
+            if not success:
+                self.parse(lambda: self.parameter_list(inferred=True), node, 'Parameters')
+            # At this stage, we can potentially have an identifier in brackets which is a legal expression, so we cannot
+            # raise errors here
+            if not self.match(')'):
+                return None
+
+            if not self.match('->'):
+                return None
+
+        if self.parse(self.expression, node, 'Expression'):
+            return node
+
+        if not self.match('{'):
+            raise CompilerException(CompilerException.SYNTAX,
+                                    "Expected opening brace, '{', after function header", self.value(-1))
+
+        while self.parse(self.statement, node, 'Statements'):
+            pass
+
+        if not self.match('}'):
+            raise CompilerException(CompilerException.SYNTAX,
+                                    "Expected closing brace, '}', after function body", self.value(-1))
+
+        return node
+
     def expression(self):
+        """
+        Parses an expression.
+        :return:
+        """
+        node = ASTNode('Expression')
+        if self.parse(self.primary, node, 'Primary'):
+            return node
+        return None
+
+    def primary(self):
+        """
+        Parses a primary expression, which is the simplest form of an expression.
+
+        | **Primary**  ::=  Literal | 'this' | FunctionInvocation | ClassCreation | ArrayCreation | ('(' Expression ')')
+
+        The name of the node created indicates which type of primary was created. The name of the child will be the same
+        as the name of the node
+
+        Returns:
+            ASTNode: The node generated by parsing the primary expression, or None if parsing failed
+        """
+        node = ASTNode('')
+        if self.match('this'):
+            node.name = 'This'
+            node.addchild('This', self.value(-1))
+            return node
+
+        if self.match('true') or self.match('false'):
+            node.name = 'BoolLiteral'
+            node.addchild('BoolLiteral', self.value(-1))
+            return node
+
+        if self.match('null'):
+            node.name = 'NullLiteral'
+            node.addchild('NullLiteral', self.value(-1))
+            return node
+
+        if self.get_type() == Token.string:
+            node.name = 'StringLiteral'
+            node.addchild('StringLiteral', self.value())
+            self.index += 1
+            return node
+
+        if self.get_type() == Token.character:
+            node.name = 'CharacterLiteral'
+            node.addchild('CharacterLiteral', self.value())
+            self.index += 1
+            return node
+
+        if self.get_type() == Token.integer:
+            node.name = 'IntegerLiteral'
+            node.addchild('IntegerLiteral', self.value())
+            self.index += 1
+            return node
+
+        if self.get_type() == Token.float:
+            node.name = 'FloatLiteral'
+            node.addchild('FloatLiteral', self.value())
+            self.index += 1
+            return node
+
+        if self.parse(self.class_declaration, node, 'ClassDeclaration'):
+            node.name = 'ClassDeclaration'
+            return node
+
+        if self.parse(self.function_invocation, node, 'FunctionInvocation'):
+            node.name = 'FunctionInvocation'
+            return node
+
+        if self.parse(self.array_creation, node, 'ArrayCreation'):
+            node.name = 'ArrayCreation'
+            return node
+
+        return None
+
+    def array_initialization(self):
+        """
+        Parses an array initialization. An array initialization creates an array, but does not set any of the values
+
+        | **ArrayInitialization**       ::=  ('new' NonFunctionArrayType DimExpressions Dims)
+        | **DimExpressions**            ::=  ('[' Expression ']')+
+        | **Dims**                      ::=  ('[' ']')*
+
+        """
+        # The node is called ArrayCreation becuase it is passed up to the array creation function, which uses the
+        # node directly as its own node.
+        node = ASTNode('ArrayCreation', {'DimExpressions': [], 'Dims': []})
+        if not self.match('new'):
+            return None
+        if not self.parse(self.non_function_array_type, node, 'Type'):
+            raise CompilerException(CompilerException.SYNTAX, "Expected type after 'new' keyword", self.value(-1))
+        # At this stage could still be a class creation
+        if not self.match('['):
+            return None
+        if not self.parse(self.expression, node, 'DimExpressions'):
+            return None
+        if not self.match(']'):
+            raise CompilerException(CompilerException.SYNTAX, "Expected closing square bracket, ']' after array "
+                                                              "dimension", self.value(-1))
+
+        finished = False
+        while not finished and self.match('['):
+            if not self.parse(self.expression, node, 'DimExpressions'):
+                node.addchild('Dims', self.value(-1))
+                finished = True
+            if not self.match(']'):
+                raise CompilerException(CompilerException.SYNTAX, "Expected closing square bracket, ']' after array "
+                                                                  "dimension", self.value(-1))
+        if finished:
+            node.addchild('Dims', self.value(-1))
+
+        while self.match('['):
+            node.addchild('Dims', self.value(-1))
+            if not self.match(']'):
+                raise CompilerException(CompilerException.SYNTAX,
+                                        "Unmatched bracket. Expected closing square bracket, '[', after the opening "
+                                        "square bracket, ']', in array type", self.value(-1))
+            node.addchild('Dims', self.value(-1))
+
+        return node
+
+    def array_creation(self):
+        """
+        Parses an array creation expression. Arrays can be created with reference types, primitive types and function
+        types, but not array types (because it is itself an array). Thus, it is defined as
+
+        | **ArrayCreationExpression**   ::=  ArrayInitialization | ('new' NonFunctionType ArrayInitializer)
+
+        Creates a node with the following children
+            - Type - ASTNode containing the type of the array
+            - DimExpressions - If an array initialization was parsed, this is a list of ASTNodes, containing the
+              expressions defining the dimensions of the array (does not exist if an ArrayInitialization is not parsed)
+            - Dims - If an array initialization was parsed, this is a list of CodeObjects containing any square brackets
+              without dimension values (does not exist if an ArrayInitialization is not parsed. In this case, any Dims
+              are contained within the Type node)
+            - ArrayInitializer - ASTNode containing an ArrayInitializer node (does not exist if an ArrayInitialization
+              is parsed)
+        """
+        node = ASTNode('ArrayCreation')
+        if self.parse(self.array_initialization, node, 'ArrayInitializer'):
+            return node['ArrayInitializer']
+
+        if not self.match('new'):
+            return None
+
+        if not self.parse(self.non_function_type, node, 'Type'):
+            raise CompilerException(CompilerException.SYNTAX, "Expected type after 'new' keyword", self.value(-1))
+
+        if len(node['Type']['Dims']) < 2:
+            return None     # Not an array. Possibly a class creation, so don't raise error
+
+        if not self.parse(self.array_initializer, node, 'ArrayInitializer'):
+            # This will always point to the first square bracket in the array initializer
+            raise CompilerException(CompilerException.SYNTAX,
+                                    "Expected either array dimensions or an array initializer",
+                                    self.value(-len(node['Type']['Dims'])))
+        return node
+
+    def function_invocation(self):
+        return None
+
+    def class_creation(self):
         return None
 
     def statement(self):
@@ -605,10 +871,8 @@ class Parser:
         Parses any type that is not a function type. This includes class and generic types (ReferenceType), primitives,
         arrays of reference and primitive types and also arrays of functions (but not functions on their own)
 
-        | **NonFunctionType**   ::=  NonArrayType Dims?
-        | **NonArrayType**      ::=  ReferenceType | PrimitiveType | ('(' FunctionType ')')
-        | **PrimitiveType**     ::=  'byte' | 'char' | 'bool'
-        | **Dims**              ::=  ('[' ']')+
+        | **NonFunctionType**   ::=  NonFunctionArrayType Dims
+        | **Dims**              ::=  ('[' ']')*
 
         The name of the node returned indicates what the type is. It will be one of PrimitiveType, ReferenceType or
         FunctionType. Each one has two children. The first is the type, whose name matches the name of the node. For
@@ -620,21 +884,13 @@ class Parser:
             ASTNode: The node generated by parsing the non function type, or None if parsing failed
         """
         node = ASTNode('', {'Dims': []})
-        start = self.index
-        if self.match('('):
-            if not self.parse(self.function_type, node, 'FunctionType'):
-                return None
-            node.name = 'FunctionType'
-            if not self.match(')'):
-                raise CompilerException(CompilerException.SYNTAX, "Unmatched bracket. Expected closing bracket after "
-                                                                  "function type definition", self.tokens[start][1])
-        elif self.parse(self.reference_type, node, 'ReferenceType'):
-            node.name = 'ReferenceType'
-        elif self.match('byte') or self.match('char') or self.match('bool'):
-            node.name = 'PrimitiveType'
-            node.addchild('PrimitiveType', self.value(-1))
-        else:
+        if not self.parse(self.non_function_array_type, node, 'Type'):
             return None
+
+        # Unwrap the generated node, to simplify the tree
+        node.name = node['Type'].name
+        node[node.name] = node['Type'][node.name]
+        del node.children['Type']
 
         while self.match('['):
             node.addchild('Dims', self.value(-1))
@@ -645,6 +901,42 @@ class Parser:
             node.addchild('Dims', self.value(-1))
 
         return node
+
+    def non_function_array_type(self):
+        """
+        Parses a type that is not a function or array. This is necessary as the type in an array creation expression
+        cannot itself be an array, and function types must be inside brackets (raw function type is ambigous)
+
+        | **NonFunctionArrayType**      ::=  ReferenceType | PrimitiveType | ('(' FunctionType ')')
+        | **PrimitiveType**             ::=  'byte' | 'char' | 'bool'
+
+        Note: this does not create its own node, instead it simply returns the node generated by parsing one of the
+            sub types
+
+        Returns:
+            ASTNode: The node generated by parsing the non function array type, or None if parsing failed
+        """
+        node = ASTNode('')
+        start = self.index
+        if self.match('('):
+            if not self.parse(self.function_type, node, 'FunctionType'):
+                return None
+            if not self.match(')'):
+                raise CompilerException(CompilerException.SYNTAX, "Unmatched bracket. Expected closing bracket after "
+                                                                  "function type definition", self.tokens[start][1])
+            node.name = 'FunctionType'
+            return node
+
+        if self.parse(self.reference_type, node, 'ReferenceType'):
+            node.name = 'ReferenceType'
+            return node
+
+        if self.match('byte') or self.match('char') or self.match('bool'):
+            node.name = 'PrimitiveType'
+            node.addchild('PrimitiveType', self.value(-1))
+            return node
+
+        return None
 
     def reference_type(self):
         """
@@ -763,10 +1055,10 @@ class ASTNode:
       not known how many children of a certain type a node will have. For example, a parameter list will have an
       arbitrary number of ASTNode children, one for each parameter
     For example, a class declaraction node may have the following children:
-        'privacy modifier', 'name', 'variable declarations', 'method declarations'
-    where 'privacy modifier' and 'name' both consist of a token, and 'variable declarations',
-    'method declarations' would both be lists of ASTNodes, since we cannot know how many variables/methods a class will
-    have
+        'PrivacyModifier', 'Name', 'FieldDeclarations', 'FunctionDeclarations'
+    where 'PrivacyModifier' and 'Name' both consist of a token, and 'FieldDeclarations',
+    'FunctionDeclarations' would both be lists of ASTNodes, since we cannot know how many variables/functions a class
+    will have
 
     Attributes:
         name (str): the name/type of the ASTNode
@@ -823,11 +1115,21 @@ class ASTNode:
             if type(child) is list:
                 if len(child) == 0:
                     continue
-                if type(child[0]) is ASTNode:
+
+                list_type = 'terminal'
+                for item in child:
+                    if type(item) is ASTNode:
+                        list_type = 'non terminal'
+                        break
+
+                if list_type == 'non terminal':
                     print(prefix + name)
                     for i in range(len(child)):
-                        print('|   ' + prefix + str(i) + ' (' + child[i].name + ')')
-                        child[i].print_tree(depth + 2)
+                        if child[i] is None:
+                            print('|   ' + prefix + str(i) + ' (None)')
+                        else:
+                            print('|   ' + prefix + str(i) + ' (' + child[i].name + ')')
+                            child[i].print_tree(depth + 2)
                 else:
                     print(prefix + name + ": " + str(child))
             elif type(child) is ASTNode:

@@ -6,12 +6,12 @@ from error import CompilerException
 from cstring import Code, CodeObject, PositionedString
 
 keywords = ['public', 'private', 'class', 'static', 'byte', 'char', 'bool', 'constructor', 'true', 'false', 'null',
-            'import', 'void']
+            'import', 'void', 'new']
 
-operators = ['...', '->', '+', '-', '*', '/', '?', ':', '<<', '=', '==', '!=', '-=', '+=', '*=', '/=', '%', '%=', '!', '&',
-             '|', '&=', '|=', '<', '>', '<=', '>=', '^']
+operators = ['->', '+', '-', '*', '/', '?', ':', '<<', '=', '==', '!=', '-=', '+=', '*=', '/=', '%', '%=', '!',
+             '&', '|', '&=', '|=', '<', '>', '<=', '>=', '^']
 
-separators = ['(', ')', '{', '}', '[', ']', '.', ',', ';', '...']
+separators = ['...', '(', ')', '{', '}', '[', ']', '.', ',', ';']
 
 
 class Token(Enum):
@@ -118,7 +118,7 @@ class Tokenizer:
     def tokenize_keyword(self):
         """
         Tokenizes a keyword. A keyword is any of the following words
-            public, private, class, static, byte, char, boolean, constructor, true, false, null, import
+            public, private, class, static, byte, char, boolean, constructor, true, false, null, import, void, new
 
         Returns:
             bool: True if a keyword was tokenized, False otherwise
@@ -152,7 +152,7 @@ class Tokenizer:
     def tokenize_operator(self):
         """
         Tokenizes an operator. An operator is any one of the following
-            +, -, *, /, ?, :, <<, >>, =, ==, !=, -=, +=, *=, /=, %, %=, !, &, |, &=, |=, <, >, <=, >=, ^
+            ->, +, -, *, /, ?, :, <<, >>, =, ==, !=, -=, +=, *=, /=, %, %=, !, &, |, &=, |=, <, >, <=, >=, ^
 
         Returns:
             bool: True if an operator was tokenized, False otherwise
@@ -165,7 +165,7 @@ class Tokenizer:
     def tokenize_separator(self):
         """
         Tokenizes a separator. An separator is any one of the following
-            '(', ')', '{', '}', '[', ']', '.', ',', ';', '...'
+            '...', '(', ')', '{', '}', '[', ']', '.', ',', ';'
 
         Returns:
             bool: True if an separator was tokenized, False otherwise
@@ -409,9 +409,9 @@ class Tokenizer:
                     raise CompilerException(CompilerException.SYNTAX, 'Invalid hex escape in character literal',
                                             self.code.substring_relative(-1, 2))
         else:
-            character = self.code[0]
+            character = self.code[0].text
             self.code.advance()
-            if not 32 <= ord(character.text) <= 126:
+            if not 32 <= ord(character) <= 126:
                 raise CompilerException(CompilerException.SYNTAX,
                                         "Invalid character. Only characters with an ACSII value between 32 (space) and "
                                         "126 (~) can be used in character literals", self.code[-1])
