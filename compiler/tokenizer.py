@@ -164,7 +164,7 @@ class Tokenizer:
 
     def tokenize_separator(self):
         """
-        Tokenizes a separator. An separator is any one of the following
+        Tokenizes a separator. A separator is any one of the following
             '...', '(', ')', '{', '}', '[', ']', '.', ',', ';'
 
         Returns:
