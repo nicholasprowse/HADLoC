@@ -13,6 +13,7 @@ from assembler.assembler import assemble
 from compiler.compiler import jcompile
 from error import HADLOCException
 from utils import get_file_name
+from emulator.emulator import emulate
 
 # TODO Serial read can raise a SerialError if the connection is lost midread. Should catch these errors
 
@@ -46,7 +47,7 @@ def get_serial():
     ser = serial.Serial(ports[int(choice) - 1].device, 115200)
     ser.timeout = 2
     response = ser.read_until().decode()
-    if len(response) is not 0:
+    if len(response) != 0:
         print(response, end="")
     else:
         raise HADLOCException(HADLOCException.SERIAL,
@@ -76,14 +77,15 @@ def connect_serial(device_name):
         return INCORRECT_PORT_ERROR
 
 
-def get_serial_from_args(args):
+def get_serial_from_args(args, program_name):
     """
     Gets the serial port gives an argparse args object. The args object must have the following 2 arguments
         a: Boolean value indicating if the serial port should be found automatically
         port: String containing the name of the serial port. Can be None
     If a is False and port is None, then the user is prompted to select a serial port using the get_serial() function
     Args:
-        args: argparse args object with boolean value a and string value port (port can be None
+        args: argparse args object with boolean value a and string value port (port can be None)
+        program_name: name of the program obtained from parser.prog, used for error message
 
     Returns:
         The serial port that has been selected
@@ -91,7 +93,7 @@ def get_serial_from_args(args):
     Raises:
         HADLOCException: If the given method of selecting the serial port was unsuccessful
     """
-    if args.a:
+    if args.auto_port:
         ser = find_serialport_auto()
         if ser is None:
             raise HADLOCException(HADLOCException.SERIAL,
@@ -105,19 +107,19 @@ def get_serial_from_args(args):
         elif ser == PORT_DOES_NOT_EXIST_ERROR:
             raise HADLOCException(HADLOCException.SERIAL,
                                   "The serial port '{}' does not exist. For a list of current "
-                                  "serial ports use '{} serialports'".format(args.port, parser.prog))
+                                  "serial ports use '{} serialports'".format(args.port, program_name))
     else:
         ser = get_serial()
     print("Connection established to programmer", flush=True)
     return ser
 
 
-def execute_load(args):
-    writer.write_data(get_serial_from_args(args), args.file)
+def execute_load(args, program_name):
+    writer.write_data(get_serial_from_args(args, program_name), args.file)
 
 
-def execute_read(args):
-    data = writer.read_data(get_serial_from_args(args), args.bytes)
+def execute_read(args, program_name):
+    data = writer.read_data(get_serial_from_args(args, program_name), args.bytes)
     base = 'hex' if args.x else ('dec' if args.d else 'bin')
     writer.display(sys.stdout, data, base)
     if args.file is not None:
@@ -125,18 +127,18 @@ def execute_read(args):
         args.file.close()
 
 
-def execute_assemble(args):
+def execute_assemble(args, program_name):
     warnings, files = assemble(args.file)
     print("Successfully Assembled '{}' with {} warning{}".format(get_file_name(args.file), len(warnings),
                                                                  '' if len(warnings) == 1 else 's'), flush=True)
     for warning in warnings:
         print(warning)
 
-    if args.c:
+    if args.clean:
         for i in range(1, len(files)):
             os.remove(files[i])
-    if args.l:
-        writer.write_data(get_serial_from_args(args), open(files[0], 'r'))
+    if args.load:
+        writer.write_data(get_serial_from_args(args, program_name), open(files[0], 'r'))
         print("Successfully Loaded '{}' onto EEPROM".format(get_file_name(files[0])))
 
 
@@ -200,7 +202,7 @@ def execute_serialports(args):
     """
     ports = list_ports.comports()
     # print out the ports if a is not set
-    if not args.a:
+    if not args.auto_port:
         for port in ports:
             print(port.device)
 
@@ -216,12 +218,9 @@ def execute_serialports(args):
                                                           'Please ensure it is connected')
 
 
-parser = None
-
-
 def main():
-    global parser
     parser = argparse.ArgumentParser(description="Compiler and program loader for unnamed computer")
+    program_name = parser.prog
     subparsers = parser.add_subparsers(help="For more information on using each command, type\n'{} command_name -h'"
                                        .format(parser.prog), dest='command', title='Commands')
 
@@ -232,42 +231,41 @@ def main():
         'Assembles the given assembly file into machine code. Produces 3 files as output, raw binary file containing ' \
         'the machine code, and two text files containing the binary and hex representations of the machine code, so ' \
         'the user can read the generated machine code'
-    assemble_parser.add_argument('-c', action='store_true', default=False,
+    assemble_parser.add_argument('-c', '--clean', action='store_true', default=False,
                                  help='Cleans up (deletes) all intermediate files. The only file left will be the raw '
                                       'binary machine code file.')
-    assemble_parser.add_argument('-l', action='store_true', default=False,
+    assemble_parser.add_argument('-l', '--load', action='store_true', default=False,
                                  help='Loads the generated machine code onto a connected EEPROM')
     port_group = assemble_parser.add_mutually_exclusive_group()
-    port_group.add_argument('-a', action='store_true', default=False,
-                            help="Automatically selects the serial portthe EEPROM is connected to. "
-                                 "Can only be used if the '-l' is used. Note: this may not work on all operating "
+    port_group.add_argument('-a', '--auto-port', action='store_true', default=False,
+                            help="Automatically selects the serial port the EEPROM is connected to. "
+                                 "Can only be used if '-l' is used. Note: this may not work on all operating "
                                  "systems")
-    port_group.add_argument('port', nargs='?',
+    port_group.add_argument('--port',
                             help="Name of serial port to load the assembled machine code onto. For a list of available "
                                  "serial ports, type '{} serialports'".format(parser.prog))
 
     assemble_parser.add_argument('file', type=argparse.FileType('r'),
                                  help="The file containing the assembly code to be assembled. "
                                       "Must have the '.asm' file extension")
-    assemble_parser.set_defaults(func=execute_assemble)
+    assemble_parser.set_defaults(func=lambda x: execute_assemble(x, program_name))
 
     read_parser = subparsers.add_parser('read', help='Reads data from a connected EEPROM')
     read_parser.description = 'Reads data from a connected EEPROM and displays the data to the console. ' \
                               'If a file is given, then this data is also saved into the file'
     port_group = read_parser.add_mutually_exclusive_group()
-    port_group.add_argument('-a', action='store_true', default=False,
+    port_group.add_argument('-a', '--auto-port', action='store_true', default=False,
                             help="Automatically selects the serial port the EEPROM is connected to. "
-                                 "Can only be used if the '-l' is used. Note: this may not work on all operating "
-                                 "systems")
+                                 "Note: this may not work on all operating systems")
     port_group.add_argument('--port',
                             help="Name of serial port to read from. For a list of available "
                                  "serial ports, type '{} serialports'".format(parser.prog))
-    read_parser.add_argument('bytes', nargs='?', type=int, default=256, choices=range(1, 1 << 15), metavar='bytes',
+    read_parser.add_argument('--bytes', type=int, default=256, choices=range(1, 1 << 15), metavar='{1-32767}',
                              help='Number of bytes to read from the EEPROM. Must be less than 32768. '
                                   'Defaults to 256 if not supplied')
-    read_parser.add_argument('file', nargs='?', type=argparse.FileType('w'),
+    read_parser.add_argument('--file', type=argparse.FileType('w'),
                              help='File to save the data read from the EEPROM')
-    read_parser.set_defaults(func=execute_read)
+    read_parser.set_defaults(func=lambda x: execute_read(x, program_name))
     base_group = read_parser.add_mutually_exclusive_group()
     base_group.add_argument('-x', action='store_true', default=False, help='Displays the data read in hexadecimal')
     base_group.add_argument('-d', action='store_true', default=False, help='Displays the data read in decimal')
@@ -276,7 +274,7 @@ def main():
     load_parser = subparsers.add_parser('load', help='Loads the data in the given file onto a connected EEPROM')
     load_parser.description = "Loads the given file onto a connected EEPROM"
     port_group = load_parser.add_mutually_exclusive_group()
-    port_group.add_argument('-a', action='store_true', default=False,
+    port_group.add_argument('-a', '--auto-port', action='store_true', default=False,
                             help="Automatically selects the serial port the EEPROM is connected to. "
                                  "Note: this may not work on all operating systems")
     port_group.add_argument('--port',
@@ -290,7 +288,7 @@ def main():
                                   "user to write comments anywhere in the file, so long as the machine code is the "
                                   "first 8 '0' and '1' characters in a given line. If the file is anything other than "
                                   "a text file then the raw binary data is loaded")
-    load_parser.set_defaults(func=execute_load)
+    load_parser.set_defaults(func=lambda x: execute_load(x, program_name))
 
     serialports_parser = subparsers.add_parser('serialports',
                                                help='Displays a list of the currently available serial ports')
@@ -298,10 +296,24 @@ def main():
                                      "serial ports. If the '-a' option is supplied, then the serial ports will be " \
                                      "searched to see if one is connected to an EEPROM writer. If one is found, then " \
                                      "its name will be returned"
-    serialports_parser.add_argument('-a', action='store_true', default=False,
+    serialports_parser.add_argument('-a', '--auto-port', action='store_true', default=False,
                                     help='Attempts to find the serial port the EEPROM writer is connected to, and'
                                          'returns the name of this serial port')
     serialports_parser.set_defaults(func=execute_serialports)
+
+    emulator_parser = subparsers.add_parser('emulator',
+                                            help='Starts the emulator running the given binary file. In debug mode, '
+                                                 'instructions can be stepped through one by one, and regester/memory '
+                                                 'contents are shown')
+    emulator_parser.description = 'Starts the emulator running the given binary file. In debug mode, ' \
+                                  'instructions can be stepped through one by one, and regester/memory ' \
+                                  'contents are shown'
+    emulator_parser.add_argument('-d', '--debug', action='store_true',
+                                 help='Runs in debug mode. In debug mode, each instruction can be stepped through '
+                                      'one by one, and regester/memory contents are shown')
+    emulator_parser.add_argument('file', type=argparse.FileType('rb'),
+                                 help='Binary file to execute. Must contain HADLoC machine code')
+    emulator_parser.set_defaults(func=emulate)
 
     args = parser.parse_args()
 
@@ -334,4 +346,4 @@ def assemble_test():
 
 
 if __name__ == "__main__":
-    test()
+    main()
