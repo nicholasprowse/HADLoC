@@ -13,7 +13,7 @@ from assembler.assembler import assemble
 from compiler.compiler import jcompile
 from error import HADLOCException
 from utils import get_file_name
-from emulator.emulator import emulate
+import emulator.display
 
 # TODO Serial read can raise a SerialError if the connection is lost midread. Should catch these errors
 
@@ -313,7 +313,7 @@ def main():
                                       'one by one, and regester/memory contents are shown')
     emulator_parser.add_argument('file', type=argparse.FileType('rb'),
                                  help='Binary file to execute. Must contain HADLoC machine code')
-    emulator_parser.set_defaults(func=emulate)
+    emulator_parser.set_defaults(func=emulator.display.start)
 
     args = parser.parse_args()
 

@@ -1,15 +1,6 @@
 import curses
 
 from .word import Word
-from .disassembler import disassemble
-
-TEXT = 1
-WHITE = 2
-GREY = 3
-HIGHLIGHT_1 = 4
-HIGHLIGHT_2 = 5
-
-DISPLAY_HEIGHT = 24
 
 OPCODE_MAPPING = {
     0b0000: 0b001101,
@@ -30,17 +21,6 @@ OPCODE_MAPPING = {
     0b0010: 0b000001
 }
 
-ESC = 27
-F5 = 269
-F6 = 270
-F12 = 276
-
-BOX_VERT = '\u2503'
-BOX_HOR = '\u2501'
-BOX_BOTTOM_RIGHT = '\u251b'
-BOX_BOTTOM_LEFT = '\u2517'
-BOX_TOP_RIGHT = '\u2513'
-BOX_TOP_LEFT = '\u250f'
 
 class Display:
     def __init__(self, screen):
@@ -59,7 +39,7 @@ class Display:
             # Curses throws error if cursor exceeds screen bounds. Render still works, so we just need to catch the
             # error, and everything will work
             try:
-                self.screen.addstr(i, 0, ''.join(line), curses.color_pair(TEXT))
+                self.screen.addstr(i, 0, ''.join(line), curses.color_pair(1))
             except curses.error:
                 pass
         self.screen.refresh()
@@ -89,43 +69,6 @@ class Display:
             self.increment = 1 if val[1] else -1
 
         self.render()
-
-
-class MemoryDisplay:
-    def __init__(self, screen, data, data_display):
-        self.data_display = data_display
-        self.data = data
-        self.screen = screen
-        self.start = 0
-        self.highlighted_element = -1
-        self.alternative_highlight = -1
-
-    def render(self):
-        for line, i in enumerate(range(self.start, self.start + DISPLAY_HEIGHT)):
-            if i == self.highlighted_element:
-                color = HIGHLIGHT_1
-            elif i == self.alternative_highlight:
-                color = HIGHLIGHT_2
-            elif i % 2 == 0:
-                color = WHITE
-            else:
-                color = GREY
-            self.screen.addstr(line, 0, f' {i:04x} ', curses.color_pair(color))
-            try:
-                format_string = f'{{:<{self.screen.getmaxyx()[1] - 6}s}}'
-                self.screen.addstr(line, 6,
-                                   format_string.format(self.data_display(self.data[i])), curses.color_pair(color))
-            except curses.error:
-                pass
-        self.screen.refresh()
-
-    def highlight_element(self, index: int):
-        self.highlighted_element = index
-        if self.highlighted_element < self.start or self.highlighted_element >= self.start + DISPLAY_HEIGHT:
-            self.start = max(0, min(self.highlighted_element - 5, len(self.data) - DISPLAY_HEIGHT))
-
-    def highlight_alternative_element(self, index: int):
-        self.alternative_highlight = index
 
 
 class Computer:
@@ -267,116 +210,3 @@ class Computer:
             self.X = out
         else:
             self.L = out
-
-
-def main(screen, program: list[int], debug: bool):
-    screen.clear()
-    curses.curs_set(False)
-    curses.init_pair(TEXT, curses.COLOR_WHITE + 8, curses.COLOR_BLACK)
-    curses.init_pair(WHITE, curses.COLOR_BLACK, curses.COLOR_WHITE + 8)
-    curses.init_pair(GREY, curses.COLOR_BLACK, curses.COLOR_WHITE)
-    curses.init_pair(HIGHLIGHT_1, curses.COLOR_BLACK, curses.COLOR_GREEN + 8)
-    curses.init_pair(HIGHLIGHT_2, curses.COLOR_BLACK, curses.COLOR_CYAN + 8)
-
-    # Draw box around input
-    display = curses.newwin(9, 22)
-    computer = Computer(program, display.subwin(4, 20, 1, 1))
-    register_screen, rom_screen, ram_screen = None, None, None
-    if debug:
-        register_screen = curses.newwin(10, 20, 10, 0)
-        ram_screen = MemoryDisplay(curses.newwin(24, 16, 0, 24), computer.RAM, lambda x: f' {x:02x} ({x})')
-        rom_screen = MemoryDisplay(curses.newwin(24, 20, 0, 44), computer.ROM, lambda x: f' {x:02x} {disassemble(x)}')
-
-    screen.refresh()
-    display.addstr(0, 0, BOX_TOP_LEFT + (BOX_HOR * 20) + BOX_TOP_RIGHT, curses.color_pair(TEXT))
-    display.addstr(5, 0, BOX_BOTTOM_LEFT + (BOX_HOR * 20) + BOX_BOTTOM_RIGHT, curses.color_pair(TEXT))
-    for i in range(4):
-        display.addstr(i + 1, 0, BOX_VERT, curses.color_pair(TEXT))
-        display.addstr(i + 1, 21, BOX_VERT, curses.color_pair(TEXT))
-    display.refresh()
-
-    paused = True
-    display.addstr(7, 0, f'{"PAUSED" if paused else "RUNNING":^22s}', curses.color_pair(TEXT))
-    display.refresh()
-    while True:
-        if debug:
-            register_screen.addstr(0, 0, f'PC: {computer.PC:04x} {f"({computer.PC})":<5s}', curses.color_pair(TEXT))
-            register_screen.addstr(1, 0, f'L:    {computer.L:02x} {f"({computer.L})":<5s}', curses.color_pair(TEXT))
-            register_screen.addstr(2, 0, f'H:    {computer.H:02x} {f"({computer.H})":<5s}', curses.color_pair(TEXT))
-            register_screen.addstr(3, 0, f'X:    {computer.X:02x} {f"({computer.X})":<5s}', curses.color_pair(TEXT))
-            register_screen.addstr(4, 0, f'Y:    {computer.Y:02x} {f"({computer.Y})":<5s}', curses.color_pair(TEXT))
-            try:
-                register_screen.addstr(5, 0,
-                                       f'IN:   {computer.IN:02x} {f"({computer.IN})":<5s} [{chr(computer.IN.val)}]',
-                                       curses.color_pair(TEXT))
-            except ValueError:
-                register_screen.addstr(5, 0, f'IN:   {computer.IN:02x} {f"({computer.IN})":<5s} [ ]',
-                                       curses.color_pair(TEXT))
-            register_screen.addstr(6, 0, f'CF={1 if computer.CF else 0}    IF={1 if computer.IF else 0}',
-                                   curses.color_pair(TEXT))
-            register_screen.refresh()
-            a = computer.H.concat(computer.L).val
-            rom_screen.highlight_element(computer.PC.val)
-            rom_screen.highlight_alternative_element(a)
-            rom_screen.render()
-            ram_screen.highlight_element(a)
-            ram_screen.render()
-
-            key = screen.getch()
-            if paused:
-                while key not in [F5, F6, F12, ESC]:
-                    key = screen.getch()
-
-            if key == F5:
-                paused = not paused
-                display.addstr(7, 0, f'{"PAUSED" if paused else "RUNNING":^22s}', curses.color_pair(TEXT))
-                display.refresh()
-                screen.nodelay(not paused)
-
-            if key == F12:
-                computer.PC = Word(0, bits=15)
-
-            if key == ESC:
-                break
-
-        if computer.terminated():
-            display.addstr(6, 0, f'{"TERMINATED":^22s}', curses.color_pair(TEXT))
-            display.refresh()
-            screen.nodelay(False)
-            key = screen.getch()
-            while key not in [F12, ESC]:
-                if key == F5:
-                    paused = not paused
-                    display.addstr(7, 0, f'{"PAUSED" if paused else "RUNNING":^22s}', curses.color_pair(TEXT))
-                    display.refresh()
-                key = screen.getch()
-
-            if key == F12:
-                computer.PC = Word(0, bits=15)
-                display.addstr(6, 0, ' '*22)
-                display.refresh()
-                screen.nodelay(not paused)
-                continue
-
-            if key == ESC:
-                break
-
-        computer.execute()
-
-
-def emulate(args):
-    program = list(args.file.read())
-    curses.wrapper(lambda screen: main(screen, program, args.debug))
-
-
-def test():
-    with open('/Users/nicholasprowse/Documents/Programming/HADLoC Programs/decimal/decimal.bin', 'rb') as f:
-        program = list(f.read())
-    computer = Computer(program, None)
-
-    while computer.execute() or True:
-        pass
-
-
-if __name__ == '__main__':
-    test()
