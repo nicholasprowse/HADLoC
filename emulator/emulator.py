@@ -1,9 +1,7 @@
 import curses
-import sys
 
 from .word import Word
 from .disassembler import disassemble
-
 
 TEXT = 1
 WHITE = 2
@@ -32,9 +30,19 @@ OPCODE_MAPPING = {
     0b0010: 0b000001
 }
 
+ESC = 27
+F5 = 269
+F6 = 270
+F12 = 276
+
+BOX_VERT = '\u2503'
+BOX_HOR = '\u2501'
+BOX_BOTTOM_RIGHT = '\u251b'
+BOX_BOTTOM_LEFT = '\u2517'
+BOX_TOP_RIGHT = '\u2513'
+BOX_TOP_LEFT = '\u250f'
 
 class Display:
-
     def __init__(self, screen):
         self.screen = screen
         self.width = 20
@@ -135,6 +143,9 @@ class Computer:
         for i, instruction in enumerate(program):
             self.ROM[i] = Word(instruction)
         self.display = Display(screen)
+
+    def terminated(self):
+        return self.ROM[self.PC] == 0
 
     def input(self, val: int):
         self.IN = Word(val)
@@ -267,16 +278,26 @@ def main(screen, program: list[int], debug: bool):
     curses.init_pair(HIGHLIGHT_1, curses.COLOR_BLACK, curses.COLOR_GREEN + 8)
     curses.init_pair(HIGHLIGHT_2, curses.COLOR_BLACK, curses.COLOR_CYAN + 8)
 
-    display = curses.newwin(4, 20)
-    computer = Computer(program, display)
+    # Draw box around input
+    display = curses.newwin(9, 22)
+    computer = Computer(program, display.subwin(4, 20, 1, 1))
     register_screen, rom_screen, ram_screen = None, None, None
     if debug:
-        register_screen = curses.newwin(10, 20, 6, 0)
+        register_screen = curses.newwin(10, 20, 10, 0)
         ram_screen = MemoryDisplay(curses.newwin(24, 16, 0, 24), computer.RAM, lambda x: f' {x:02x} ({x})')
         rom_screen = MemoryDisplay(curses.newwin(24, 20, 0, 44), computer.ROM, lambda x: f' {x:02x} {disassemble(x)}')
 
     screen.refresh()
+    display.addstr(0, 0, BOX_TOP_LEFT + (BOX_HOR * 20) + BOX_TOP_RIGHT, curses.color_pair(TEXT))
+    display.addstr(5, 0, BOX_BOTTOM_LEFT + (BOX_HOR * 20) + BOX_BOTTOM_RIGHT, curses.color_pair(TEXT))
+    for i in range(4):
+        display.addstr(i + 1, 0, BOX_VERT, curses.color_pair(TEXT))
+        display.addstr(i + 1, 21, BOX_VERT, curses.color_pair(TEXT))
+    display.refresh()
+
     paused = True
+    display.addstr(7, 0, f'{"PAUSED" if paused else "RUNNING":^22s}', curses.color_pair(TEXT))
+    display.refresh()
     while True:
         if debug:
             register_screen.addstr(0, 0, f'PC: {computer.PC:04x} {f"({computer.PC})":<5s}', curses.color_pair(TEXT))
@@ -301,24 +322,44 @@ def main(screen, program: list[int], debug: bool):
             ram_screen.highlight_element(a)
             ram_screen.render()
 
-            key = None
-            try:
-                key = screen.getkey()
-            except curses.error:
-                pass
+            key = screen.getch()
+            if paused:
+                while key not in [F5, F6, F12, ESC]:
+                    key = screen.getch()
 
-            while key not in ['KEY_F(5)', 'KEY_F(6)']:
-                try:
-                    key = screen.getkey()
-                # Error can happen due to no key press. If not paused, continue on to next execution.
-                # If paused, we need to wait for proper key, so don't break
-                except curses.error:
-                    if not paused:
-                        break
-
-            if key == 'KEY_F(5)':
+            if key == F5:
                 paused = not paused
+                display.addstr(7, 0, f'{"PAUSED" if paused else "RUNNING":^22s}', curses.color_pair(TEXT))
+                display.refresh()
                 screen.nodelay(not paused)
+
+            if key == F12:
+                computer.PC = Word(0, bits=15)
+
+            if key == ESC:
+                break
+
+        if computer.terminated():
+            display.addstr(6, 0, f'{"TERMINATED":^22s}', curses.color_pair(TEXT))
+            display.refresh()
+            screen.nodelay(False)
+            key = screen.getch()
+            while key not in [F12, ESC]:
+                if key == F5:
+                    paused = not paused
+                    display.addstr(7, 0, f'{"PAUSED" if paused else "RUNNING":^22s}', curses.color_pair(TEXT))
+                    display.refresh()
+                key = screen.getch()
+
+            if key == F12:
+                computer.PC = Word(0, bits=15)
+                display.addstr(6, 0, ' '*22)
+                display.refresh()
+                screen.nodelay(not paused)
+                continue
+
+            if key == ESC:
+                break
 
         computer.execute()
 
