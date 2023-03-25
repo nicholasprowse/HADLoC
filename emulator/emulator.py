@@ -51,18 +51,18 @@ class Display:
             # Curses throws error if cursor exceeds screen bounds. Render still works, so we just need to catch the
             # error, and everything will work
             try:
-                self.screen.addstr(i, 0, ''.join(line))
+                self.screen.addstr(i, 0, ''.join(line), curses.color_pair(TEXT))
             except curses.error:
                 pass
         self.screen.refresh()
 
     def data(self, val: Word):
-        raise sys.exit("Data was written to!!!")
-        # row = self.address // self.width
-        # column = self.address % self.width
-        # self.text[row][column] = chr(val)
-        # self.address = (self.address + self.increment) % (self.width * self.height)
-        # self.render()
+        # raise sys.exit("Data was written to!!!")
+        row = self.address // self.width
+        column = self.address % self.width
+        self.text[row][column] = chr(val.val)
+        self.address = (self.address + self.increment) % (self.width * self.height)
+        self.render()
 
     def instruction(self, val: Word):
         msb = val.msb()
@@ -154,11 +154,16 @@ class Computer:
     def execute(self):
         """Executes a single instruction"""
         instruction = self.ROM[self.PC]
+
+        # Halt instruction
+        if instruction == 0:
+            return
+
         self.PC += 1
         msb = instruction.msb()
         # Load byte instruction
         if msb == 7:
-            self.L = instruction[:7]
+            self.L = Word(instruction[:7].val)
 
         # Arithmetic/Logic instruction
         if msb == 6:
@@ -166,7 +171,9 @@ class Computer:
 
         # Move instruction
         if msb == 5:
-            source = instruction[:2] + instruction[4]
+            source = instruction[:2].val
+            if source == 3:
+                source += instruction[4].val
             source_value = self.X
             if source == 1:
                 source_value = self.L
@@ -177,7 +184,9 @@ class Computer:
             elif source == 4:
                 source_value = self.Y
 
-            destination = instruction[2:4] + instruction[4]
+            destination = instruction[2:4].val
+            if destination == 3:
+                destination += instruction[4].val
             if destination == 0:
                 self.X = source_value
             elif destination == 1:
@@ -226,8 +235,6 @@ class Computer:
             if self.CF == bool(instruction[0]):
                 self.H += 1
 
-        return instruction != 0
-
     def execute_al(self, out_x: Word, m: Word, opcode: Word):
         opcode = Word(OPCODE_MAPPING[opcode.val], bits=6)
         b = self.read_mem() if m else self.L
@@ -272,17 +279,20 @@ def main(screen, program: list[int], debug: bool):
     paused = True
     while True:
         if debug:
-            register_screen.addstr(0, 0, f'PC: {computer.PC:04x} {f"({computer.PC})":<5s}')
-            register_screen.addstr(1, 0, f'L:    {computer.L:02x} {f"({computer.L})":<5s}')
-            register_screen.addstr(2, 0, f'H:    {computer.H:02x} {f"({computer.H})":<5s}')
-            register_screen.addstr(3, 0, f'X:    {computer.X:02x} {f"({computer.X})":<5s}')
-            register_screen.addstr(4, 0, f'Y:    {computer.Y:02x} {f"({computer.Y})":<5s}')
+            register_screen.addstr(0, 0, f'PC: {computer.PC:04x} {f"({computer.PC})":<5s}', curses.color_pair(TEXT))
+            register_screen.addstr(1, 0, f'L:    {computer.L:02x} {f"({computer.L})":<5s}', curses.color_pair(TEXT))
+            register_screen.addstr(2, 0, f'H:    {computer.H:02x} {f"({computer.H})":<5s}', curses.color_pair(TEXT))
+            register_screen.addstr(3, 0, f'X:    {computer.X:02x} {f"({computer.X})":<5s}', curses.color_pair(TEXT))
+            register_screen.addstr(4, 0, f'Y:    {computer.Y:02x} {f"({computer.Y})":<5s}', curses.color_pair(TEXT))
             try:
                 register_screen.addstr(5, 0,
-                                       f'IN:   {computer.IN:02x} {f"({computer.IN})":<5s} [{chr(computer.IN.val)}]')
+                                       f'IN:   {computer.IN:02x} {f"({computer.IN})":<5s} [{chr(computer.IN.val)}]',
+                                       curses.color_pair(TEXT))
             except ValueError:
-                register_screen.addstr(5, 0, f'IN:   {computer.IN:02x} {f"({computer.IN})":<5s} [ ]')
-            register_screen.addstr(6, 0, f'CF={1 if computer.CF else 0}    IF={1 if computer.IF else 0}')
+                register_screen.addstr(5, 0, f'IN:   {computer.IN:02x} {f"({computer.IN})":<5s} [ ]',
+                                       curses.color_pair(TEXT))
+            register_screen.addstr(6, 0, f'CF={1 if computer.CF else 0}    IF={1 if computer.IF else 0}',
+                                   curses.color_pair(TEXT))
             register_screen.refresh()
             a = computer.H.concat(computer.L).val
             rom_screen.highlight_element(computer.PC.val)
