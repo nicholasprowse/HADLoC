@@ -115,8 +115,8 @@ def instruction_value(instruction):
 
     # In theory this is never reached, as all invalid instructions should have been caught in the tokenizing,
     # parsing and codewriting stage
-    raise BaseException("This instruction {} was not able to be encoded, and no error could be found in it. Please"
-                        " update the assembler to handle this instruction".format(instruction))
+    raise Exception("This instruction {} was not able to be encoded, and no error could be found in it. Please"
+                    " update the assembler to handle this instruction".format(instruction))
 
 
 def arithmetic_value(instruction):

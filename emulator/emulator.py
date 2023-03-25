@@ -1,12 +1,36 @@
 import curses
 import sys
 
+from .word import Word
+from .disassembler import disassemble
+
 
 TEXT = 1
 WHITE = 2
 GREY = 3
 HIGHLIGHT_1 = 4
 HIGHLIGHT_2 = 5
+
+DISPLAY_HEIGHT = 24
+
+OPCODE_MAPPING = {
+    0b0000: 0b001101,
+    0b0011: 0b110001,
+    0b1000: 0b001111,
+    0b1111: 0b110011,
+    0b1100: 0b011111,
+    0b1011: 0b110111,
+    0b0100: 0b001110,
+    0b0111: 0b110010,
+    0b1101: 0b010011,
+    0b0101: 0b000111,
+    0b1010: 0b000000,
+    0b1110: 0b010101,
+    0b1001: 0b000010,
+    0b0001: 0b000101,
+    0b0110: 0b000001,
+    0b0010: 0b000001
+}
 
 
 class Display:
@@ -32,7 +56,7 @@ class Display:
                 pass
         self.screen.refresh()
 
-    def data(self, val):
+    def data(self, val: Word):
         raise sys.exit("Data was written to!!!")
         # row = self.address // self.width
         # column = self.address % self.width
@@ -40,25 +64,23 @@ class Display:
         # self.address = (self.address + self.increment) % (self.width * self.height)
         # self.render()
 
-    def instruction(self, val):
+    def instruction(self, val: Word):
+        msb = val.msb()
         # Clear display (Unknown time)
-        if val == 1:
+        if msb == 0:
             self.address = 0
             self.increment = 1
             self.text = [[' '] * self.width for _ in range(self.height)]
 
         # Return home (1.52ms)
-        if val in [2, 3]:
+        if msb == 1:
             self.address = 0
 
         # Entry mode set
-        if val & 0xFC == 0x04:
-            self.increment = 1 if val & 0x02 else -1
+        if msb == 2:
+            self.increment = 1 if val[1] else -1
 
         self.render()
-
-
-DISPLAY_HEIGHT = 24
 
 
 class MemoryDisplay:
@@ -82,38 +104,40 @@ class MemoryDisplay:
                 color = GREY
             self.screen.addstr(line, 0, f' {i:04x} ', curses.color_pair(color))
             try:
-                self.screen.addstr(line, 6, f'{self.data_display(self.data[i]):<10s}', curses.color_pair(color))
+                format_string = f'{{:<{self.screen.getmaxyx()[1] - 6}s}}'
+                self.screen.addstr(line, 6,
+                                   format_string.format(self.data_display(self.data[i])), curses.color_pair(color))
             except curses.error:
                 pass
         self.screen.refresh()
 
-    def highlight_element(self, index):
+    def highlight_element(self, index: int):
         self.highlighted_element = index
         if self.highlighted_element < self.start or self.highlighted_element >= self.start + DISPLAY_HEIGHT:
             self.start = max(0, min(self.highlighted_element - 5, len(self.data) - DISPLAY_HEIGHT))
 
-    def highlight_alternative_element(self, index):
+    def highlight_alternative_element(self, index: int):
         self.alternative_highlight = index
 
 
 class Computer:
-    def __init__(self, program, screen):
-        self.L = 0
-        self.H = 0
-        self.PC = 0
-        self.X = 0
-        self.Y = 0
-        self.IN = 0
+    def __init__(self, program: list[int], screen):
+        self.L = Word(0)
+        self.H = Word(0, bits=7)
+        self.PC = Word(0, bits=15)
+        self.X = Word(0)
+        self.Y = Word(0)
+        self.IN = Word(0)
         self.CF = False
         self.IF = False
-        self.RAM = [0] * (2**15)
-        self.ROM = program
-        self.ROM += [0] * (2**15 - len(program))
-        self.INSTRUCTION = 0
+        self.RAM = [Word(0)] * (2 ** 15)
+        self.ROM = [Word(0)] * (2 ** 15)
+        for i, instruction in enumerate(program):
+            self.ROM[i] = Word(instruction)
         self.display = Display(screen)
 
-    def input(self, val):
-        self.IN = val
+    def input(self, val: int):
+        self.IN = Word(val)
         self.IF = True
 
     def print_state(self):
@@ -121,154 +145,110 @@ class Computer:
 
     def read_mem(self):
         """Gets the current memory value"""
-        return self.RAM[self.H << 8 | self.L]
+        return self.RAM[self.H.concat(self.L)]
 
-    def write_mem(self, value):
+    def write_mem(self, value: Word):
         """Writes the given value to the current memory location"""
-        self.RAM[self.H << 8 | self.L] = value
+        self.RAM[self.H.concat(self.L)] = value
 
     def execute(self):
         """Executes a single instruction"""
         instruction = self.ROM[self.PC]
-
+        self.PC += 1
+        msb = instruction.msb()
         # Load byte instruction
-        if instruction & 0x80:
-            self.L = instruction & 0x7F
-            self.PC += 1
+        if msb == 7:
+            self.L = instruction[:7]
 
         # Arithmetic/Logic instruction
-        elif instruction & 0x40:
-            self.execute_al(instruction & 0x20, instruction & 0x10, instruction & 0x0F)
-            self.PC += 1
+        if msb == 6:
+            self.execute_al(instruction[5], instruction[4], instruction[:4])
 
         # Move instruction
-        elif instruction & 0x20:
-            src = instruction & 0x03
-            srcval = self.X
-            s = instruction & 0x10
-            if src == 1:
-                srcval = self.L
-            elif src == 2:
-                srcval = self.IN
-            elif src == 3 and s:
-                srcval = self.Y
-            elif src == 3:
-                srcval = self.read_mem()
+        if msb == 5:
+            source = instruction[:2] + instruction[4]
+            source_value = self.X
+            if source == 1:
+                source_value = self.L
+            elif source == 2:
+                source_value = self.IN
+            elif source == 3:
+                source_value = self.read_mem()
+            elif source == 4:
+                source_value = self.Y
 
-            dst = (instruction >> 2) & 0x03
-            if dst == 0:
-                self.X = srcval
-            elif dst == 1:
-                self.L = srcval
-            elif dst == 2:
-                self.H = srcval & 0x7F
-            elif src == 3 & s:
-                self.write_mem(srcval)
-            elif src == 3:
-                self.Y = srcval
-
-            self.PC += 1
+            destination = instruction[2:4] + instruction[4]
+            if destination == 0:
+                self.X = source_value
+            elif destination == 1:
+                self.L = source_value
+            elif destination == 2:
+                self.H = source_value[:7]
+            elif destination == 3:
+                self.Y = source_value
+            elif destination == 4:
+                self.write_mem(source_value)
 
         # Jump instruction
-        elif instruction & 0x10:
-            self.PC += 1
-            if instruction & 0x08:
-                if instruction & 0x01 and 0 < self.X < 127:
-                    self.PC = self.H << 8 | self.L
-                if instruction & 0x02 and self.X == 0:
-                    self.PC = self.H << 8 | self.L
-                if instruction & 0x01 and self.X >= 128:
-                    self.PC = self.H << 8 | self.L
+        if msb == 4:
+            destination = self.H.concat(self.L)
+            if instruction[3]:
+                if instruction[0] and 0 < self.X < 127:
+                    self.PC = destination
+                if instruction[1] and self.X == 0:
+                    self.PC = destination
+                if instruction[2] and self.X >= 128:
+                    self.PC = destination
             else:
-                if instruction & 0x02 and self.CF:
-                    self.PC = self.H << 8 | self.L
-                if instruction & 0x04 and self.IF:
-                    self.PC = self.H << 8 | self.L
+                if instruction[1] and self.CF:
+                    self.PC = destination
+                if instruction[2] and self.IF:
+                    self.PC = destination
 
         # Out instruction
-        elif instruction & 0x08:
-            self.PC += 1
-            src = instruction & 0x03
-            srcval = self.X
-            s = instruction & 0x10
-            if src == 1:
-                srcval = self.L
-            elif src == 2:
-                srcval = self.IN
-            elif src == 3 and s:
-                srcval = self.Y
-            elif src == 3:
-                srcval = self.read_mem()
+        if msb == 3:
+            source = instruction[:2]
+            source_value = self.X
+            if source == 1:
+                source_value = self.L
+            elif source == 2:
+                source_value = self.IN
+            elif source == 3:
+                source_value = self.read_mem()
 
-            if instruction & 0x04:
-                self.display.data(srcval)
+            if instruction[2]:
+                self.display.data(source_value)
             else:
-                self.display.instruction(srcval)
-
-        # nop
-        elif instruction & 0x40 or instruction == 1:
-            self.PC += 1
+                self.display.instruction(source_value)
 
         # Carry instruction
-        elif instruction & 0x02:
-            if self.CF and instruction == 3:
+        if msb == 1:
+            if self.CF == bool(instruction[0]):
                 self.H += 1
-            if not self.CF and instruction == 2:
-                self.H += 1
-            self.H &= 0x7F
-            self.PC += 1
 
         return instruction != 0
 
-    def execute_al(self, x, m, opcode):
+    def execute_al(self, out_x: Word, m: Word, opcode: Word):
+        opcode = Word(OPCODE_MAPPING[opcode.val], bits=6)
         b = self.read_mem() if m else self.L
-        result = 0
-        if opcode == 0:
-            result = ~self.X
-        if opcode == 1:
-            result = (~self.X) | b
-        if opcode == 2:
-            result = ~(self.X & b)
-        if opcode == 3:
-            result = ~b
-        if opcode == 4:
-            result = self.X - 1
-            self.CF = False if self.X & 0x100 else True
-        if opcode == 5:
-            result = b - self.X
-            self.CF = True if self.X & 0x100 else False
-        if opcode == 6:
-            result = ~(self.X & b)
-        if opcode == 7:
-            result = b - 1
-            self.CF = False if self.X & 0x100 else True
-        if opcode == 8:
-            result = -self.X
-            self.CF = False if self.X & 0x100 else True
-        if opcode == 9:
-            result = self.X + b
-            self.CF = True if self.X & 0x100 else False
-        if opcode == 10:
-            result = self.X & b
-        if opcode == 11:
-            result = b + 1
-            self.CF = False if self.X & 0x100 else True
-        if opcode == 12:
-            result = self.X + 1
-            self.CF = False if self.X & 0x100 else True
-        if opcode == 13:
-            result = self.X - b
-            self.CF = True if self.X & 0x100 else False
-        if opcode == 14:
-            result = self.X or b
-        if opcode == 15:
-            result = -b
-            self.CF = False if self.X & 0x100 else True
+        x = self.X
+        if opcode[5]:
+            x = Word(0)
+        if opcode[4]:
+            x = ~x
+        if opcode[3]:
+            b = Word(0)
+        if opcode[2]:
+            b = ~b
+        out = x + b if opcode[1] else x & b
+        self.CF = out.carry if opcode[1] else self.CF
+        if opcode[0]:
+            out = ~out
 
-        if x:
-            self.X = result & 0xFF
+        if out_x:
+            self.X = out
         else:
-            self.L = result & 0xFF
+            self.L = out
 
 
 def main(screen, program: list[int], debug: bool):
@@ -285,8 +265,8 @@ def main(screen, program: list[int], debug: bool):
     register_screen, rom_screen, ram_screen = None, None, None
     if debug:
         register_screen = curses.newwin(10, 20, 6, 0)
-        rom_screen = MemoryDisplay(curses.newwin(24, 16, 0, 24), computer.ROM, lambda x: f'   {x:02x}')
-        ram_screen = MemoryDisplay(curses.newwin(24, 16, 0, 44), computer.RAM, lambda x: f'  {x:02x} ({x})')
+        ram_screen = MemoryDisplay(curses.newwin(24, 16, 0, 24), computer.RAM, lambda x: f' {x:02x} ({x})')
+        rom_screen = MemoryDisplay(curses.newwin(24, 20, 0, 44), computer.ROM, lambda x: f' {x:02x} {disassemble(x)}')
 
     screen.refresh()
     paused = True
@@ -298,29 +278,37 @@ def main(screen, program: list[int], debug: bool):
             register_screen.addstr(3, 0, f'X:    {computer.X:02x} {f"({computer.X})":<5s}')
             register_screen.addstr(4, 0, f'Y:    {computer.Y:02x} {f"({computer.Y})":<5s}')
             try:
-                register_screen.addstr(5, 0, f'IN:   {computer.IN:02x} {f"({computer.IN})":<5s} [{chr(computer.IN)}]')
+                register_screen.addstr(5, 0,
+                                       f'IN:   {computer.IN:02x} {f"({computer.IN})":<5s} [{chr(computer.IN.val)}]')
             except ValueError:
                 register_screen.addstr(5, 0, f'IN:   {computer.IN:02x} {f"({computer.IN})":<5s} [ ]')
             register_screen.addstr(6, 0, f'CF={1 if computer.CF else 0}    IF={1 if computer.IF else 0}')
             register_screen.refresh()
-            a = computer.H << 8 | computer.L
-            rom_screen.highlight_element(computer.PC)
+            a = computer.H.concat(computer.L).val
+            rom_screen.highlight_element(computer.PC.val)
             rom_screen.highlight_alternative_element(a)
             rom_screen.render()
             ram_screen.highlight_element(a)
             ram_screen.render()
 
+            key = None
             try:
                 key = screen.getkey()
-                while key not in ['KEY_F(5)', 'KEY_F(6)']:
-                    key = screen.getkey()
-
-                if key == 'KEY_F(5)':
-                    paused = not paused
-                    screen.nodelay(not paused)
-            # Catch error thrown if there is no key press
             except curses.error:
                 pass
+
+            while key not in ['KEY_F(5)', 'KEY_F(6)']:
+                try:
+                    key = screen.getkey()
+                # Error can happen due to no key press. If not paused, continue on to next execution.
+                # If paused, we need to wait for proper key, so don't break
+                except curses.error:
+                    if not paused:
+                        break
+
+            if key == 'KEY_F(5)':
+                paused = not paused
+                screen.nodelay(not paused)
 
         computer.execute()
 
