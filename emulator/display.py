@@ -96,7 +96,7 @@ class IODisplay:
         self.output_screen = screen.subwin(4, 20, 3, 1)
         self.controller = controller
         self.input_value = ''
-        self.process_key_press(127)
+        self.render_input()
         self.draw_outlines()
         self.screen.refresh()
 
@@ -129,6 +129,9 @@ class IODisplay:
                 pass
         elif key <= 255 and len(self.input_value) < 9:
             self.input_value += chr(key)
+        self.render_input()
+
+    def render_input(self):
         self.input_screen.addstr(0, 0, f'In: {self.input_value:<10s}', curses.color_pair(TEXT))
         try:
             try:
