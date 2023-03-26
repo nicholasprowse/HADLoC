@@ -1,5 +1,4 @@
 import curses
-import sys
 
 from .emulator import Computer
 from .disassembler import disassemble
@@ -10,6 +9,7 @@ WHITE = 2
 GREY = 3
 HIGHLIGHT_1 = 4
 HIGHLIGHT_2 = 5
+TEXT_RED = 6
 
 KEY_QUIT = 27
 KEY_PAUSE = curses.KEY_F5
@@ -22,6 +22,8 @@ BOX_BOTTOM_RIGHT = '\u251b'
 BOX_BOTTOM_LEFT = '\u2517'
 BOX_TOP_RIGHT = '\u2513'
 BOX_TOP_LEFT = '\u250f'
+BOX_T_LEFT = '\u2523'
+BOX_T_RIGHT = '\u252b'
 
 DISPLAY_HEIGHT = 24
 
@@ -70,60 +72,96 @@ class RegisterDisplay:
 
     def render(self):
         def render_reg(name, val):
-            return f'{name}:    {val:02x} {f"({val})":<5s}'
+            return f'{name}:    {val:02X} {f"({val})":<5s}'
 
-        self.screen.addstr(0, 0, f'PC: {self.computer.PC:04x} {f"({self.computer.PC})":<5s}', curses.color_pair(TEXT))
+        self.screen.addstr(0, 0, f'PC: {self.computer.PC:04X} {f"({self.computer.PC})":<5s}', curses.color_pair(TEXT))
         self.screen.addstr(1, 0, render_reg('L', self.computer.L), curses.color_pair(TEXT))
         self.screen.addstr(2, 0, render_reg('H', self.computer.H), curses.color_pair(TEXT))
         self.screen.addstr(3, 0, render_reg('X', self.computer.X), curses.color_pair(TEXT))
         self.screen.addstr(4, 0, render_reg('Y', self.computer.Y), curses.color_pair(TEXT))
         i = self.computer.IN
         try:
-            self.screen.addstr(5, 0, f'IN:   {i:02x} {f"({i})":<5s} [{chr(i.val)}]', curses.color_pair(TEXT))
+            self.screen.addstr(5, 0, f'IN:   {i:02X} {f"({i})":<5s} [{chr(i.val)}]', curses.color_pair(TEXT))
         except ValueError:
-            self.screen.addstr(5, 0, f'IN:   {i:02x} {f"({i})":<5s} [ ]', curses.color_pair(TEXT))
+            self.screen.addstr(5, 0, f'IN:   {i:02X} {f"({i})":<5s} [ ]', curses.color_pair(TEXT))
         self.screen.addstr(6, 0, f'CF={1 if self.computer.CF else 0}    IF={1 if self.computer.IF else 0}',
                            curses.color_pair(TEXT))
         self.screen.refresh()
 
 
-class ScreenDisplay:
+class IODisplay:
     def __init__(self, screen, controller):
         self.screen = screen
+        self.input_screen = screen.subwin(1, 20, 1, 1)
+        self.output_screen = screen.subwin(4, 20, 3, 1)
         self.controller = controller
-
-    def render(self):
-        draw_box(self.screen, (0, 0), (5, 21))
-        if self.controller.computer.terminated():
-            self.screen.addstr(6, 0, f'{"TERMINATED":^22s}', curses.color_pair(TEXT))
-        else:
-            self.screen.addstr(6, 0, ' ' * 22)
-        if self.controller.debug:
-            self.screen.addstr(7, 0,
-                               f'{"PAUSED" if self.controller.paused else "RUNNING":^22s}', curses.color_pair(TEXT))
+        self.input_value = ''
+        self.process_key_press(127)
+        self.draw_outlines()
         self.screen.refresh()
 
+    def render(self):
 
-def draw_box(screen, top_left, bottom_right):
-    width = bottom_right[1] - top_left[1] + 1
-    height = bottom_right[0] - top_left[0] + 1
-    screen.addstr(top_left[0], top_left[1],
-                  BOX_TOP_LEFT + BOX_HOR * (width - 2) + BOX_TOP_RIGHT, curses.color_pair(TEXT))
-    screen.addstr(bottom_right[0], top_left[1],
-                  BOX_BOTTOM_LEFT + BOX_HOR * (width - 2) + BOX_BOTTOM_RIGHT, curses.color_pair(TEXT))
-    for i in range(height - 2):
-        screen.addstr(i + 1, top_left[1], BOX_VERT, curses.color_pair(TEXT))
-        screen.addstr(i + 1, bottom_right[1], BOX_VERT, curses.color_pair(TEXT))
-    screen.refresh()
+        terminated_string = 'TERMINATED' if self.controller.computer.terminated() else ''
+        self.screen.addstr(8, 0, f'{terminated_string:^22s}', curses.color_pair(TEXT))
+
+        if self.controller.debug:
+            paused_message = 'PAUSED' if self.controller.paused else 'RUNNING'
+            self.screen.addstr(9, 0, f'{paused_message:^22s}', curses.color_pair(TEXT))
+
+        self.screen.refresh()
+
+    def draw_outlines(self):
+        self.screen.addstr(0, 0, BOX_TOP_LEFT + BOX_HOR * 20 + BOX_TOP_RIGHT, curses.color_pair(TEXT))
+        self.screen.addstr(2, 0, BOX_T_LEFT + BOX_HOR * 20 + BOX_T_RIGHT, curses.color_pair(TEXT))
+        self.screen.addstr(7, 0, BOX_BOTTOM_LEFT + BOX_HOR * 20 + BOX_BOTTOM_RIGHT, curses.color_pair(TEXT))
+        for i in [1, 3, 4, 5, 6]:
+            self.screen.addstr(i, 0, BOX_VERT, curses.color_pair(TEXT))
+            self.screen.addstr(i, 21, BOX_VERT, curses.color_pair(TEXT))
+
+    def process_key_press(self, key: int):
+        if key == 127:
+            self.input_value = self.input_value[:-1]
+        elif key == 10:
+            try:
+                self.controller.computer.input(self.parse_input())
+            except ValueError:
+                pass
+        elif key <= 255 and len(self.input_value) < 9:
+            self.input_value += chr(key)
+        self.input_screen.addstr(0, 0, f'In: {self.input_value:<10s}', curses.color_pair(TEXT))
+        try:
+            try:
+                parsed = self.parse_input()
+                self.input_screen.addstr(0, 16, f'0x{parsed:02X}', curses.color_pair(TEXT))
+            except ValueError:
+                self.input_screen.addstr(0, 16, '----', curses.color_pair(TEXT_RED))
+        except curses.error:
+            pass
+        self.input_screen.refresh()
+
+    def parse_input(self):
+        if len(self.input_value) == 0:
+            return 0
+        if len(self.input_value) == 1:
+            return ord(self.input_value)
+        if self.input_value[0] == 'x':
+            return int(self.input_value[1:], 16)
+        if self.input_value[0] == 'b':
+            return int(self.input_value[1:], 2)
+        if self.input_value[0] == 'd':
+            return int(self.input_value[1:])
+        return int(self.input_value)
 
 
 class Controller:
     def __init__(self, screen, program: list[int], debug: bool):
         self.screen = screen
+        screen.refresh()
         self.debug = debug
-        self.display = ScreenDisplay(curses.newwin(9, 22), self)
-        self.computer = Computer(program, self.display.screen.subwin(4, 20, 1, 1))
-        self.register_display = RegisterDisplay(self.computer, curses.newwin(10, 20, 10, 0))
+        self.display = IODisplay(curses.newwin(11, 22), self)
+        self.computer = Computer(program, self.display.output_screen)
+        self.register_display = RegisterDisplay(self.computer, curses.newwin(10, 20, 11, 0))
         self.ram_screen = MemoryDisplay(curses.newwin(24, 16, 0, 24),
                                         self.computer.RAM, lambda x: f' {x:02x} ({x})')
         self.rom_screen = MemoryDisplay(curses.newwin(24, 20, 0, 44),
@@ -172,8 +210,22 @@ class Controller:
         if self.computer.terminated():
             self.display.render()
 
-        if self.get_key() != KEY_RESET:
+        delay = (self.paused and self.debug) or self.computer.terminated()
+        self.screen.nodelay(not delay)
+        key = self.screen.getch()
+
+        if key == KEY_QUIT:
+            raise SystemExit
+        elif key == KEY_RESET:
+            self.computer.PC = Word(0, bits=15)
+            self.display.render()
+        elif key == KEY_PAUSE:
+            self.paused = not self.paused
+            self.display.render()
+        elif key == KEY_STEP or (key == curses.ERR and not delay):
             self.computer.execute()
+        else:
+            self.display.process_key_press(key)
 
 
 def initialise_curses(screen):
@@ -184,6 +236,7 @@ def initialise_curses(screen):
     curses.init_pair(GREY, curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(HIGHLIGHT_1, curses.COLOR_BLACK, curses.COLOR_GREEN + 8)
     curses.init_pair(HIGHLIGHT_2, curses.COLOR_BLACK, curses.COLOR_CYAN + 8)
+    curses.init_pair(TEXT_RED, curses.COLOR_RED + 8, curses.COLOR_BLACK)
 
 
 def main(screen, program: list[int], debug: bool):

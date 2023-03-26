@@ -94,9 +94,6 @@ class Computer:
         self.IN = Word(val)
         self.IF = True
 
-    def print_state(self):
-        pass
-
     def read_mem(self):
         """Gets the current memory value"""
         return self.RAM[self.H.concat(self.L)]
@@ -133,6 +130,7 @@ class Computer:
                 source_value = self.L
             elif source == 2:
                 source_value = self.IN
+                self.IF = False
             elif source == 3:
                 source_value = self.read_mem()
             elif source == 4:
