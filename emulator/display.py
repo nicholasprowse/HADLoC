@@ -136,9 +136,9 @@ class IODisplay:
         try:
             try:
                 parsed = self.parse_input()
-                self.input_screen.addstr(0, 16, f'0x{parsed:02X}', curses.color_pair(TEXT))
+                self.input_screen.addstr(0, 15, f' 0x{parsed:02X}', curses.color_pair(TEXT))
             except ValueError:
-                self.input_screen.addstr(0, 16, '----', curses.color_pair(TEXT_RED))
+                self.input_screen.addstr(0, 15, 'ERROR', curses.color_pair(TEXT_RED))
         except curses.error:
             pass
         self.input_screen.refresh()

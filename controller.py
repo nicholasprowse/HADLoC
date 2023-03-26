@@ -4,6 +4,7 @@ import os
 
 
 import argparse
+import textwrap
 from serial.tools import list_ports
 from serial import SerialException
 import serial
@@ -218,6 +219,17 @@ def execute_serialports(args):
                                                           'Please ensure it is connected')
 
 
+class MultilineFormatter(argparse.HelpFormatter):
+    def _fill_text(self, text, width, indent):
+        paragraphs = text.split('|n')
+        multiline_text = ''
+        for paragraph in paragraphs:
+            paragraph = self._whitespace_matcher.sub(' ', paragraph).strip()
+            formatted_paragraph = textwrap.fill(paragraph, width, initial_indent=indent, subsequent_indent=indent)
+            multiline_text = f'{multiline_text}\n{formatted_paragraph}'
+        return multiline_text
+
+
 def main():
     parser = argparse.ArgumentParser(description="Compiler and program loader for unnamed computer")
     program_name = parser.prog
@@ -303,14 +315,39 @@ def main():
 
     emulator_parser = subparsers.add_parser('emulator',
                                             help='Starts the emulator running the given binary file. In debug mode, '
-                                                 'instructions can be stepped through one by one, and regester/memory '
-                                                 'contents are shown')
-    emulator_parser.description = 'Starts the emulator running the given binary file. In debug mode, ' \
-                                  'instructions can be stepped through one by one, and regester/memory ' \
-                                  'contents are shown'
+                                                 'instructions can be stepped through one by one, and register/memory '
+                                                 'contents are shown',
+                                            formatter_class=MultilineFormatter)
+    emulator_parser.description = textwrap.dedent('''
+    Starts the emulator running the given binary file. In debug mode, instructions can be stepped through one by one, 
+    and register/memory contents are shown''')
+    emulator_parser.epilog = textwrap.dedent('''
+    Using the emulator|n|n
+        
+    Controls|n
+    F5 - Pause/Resume execution. Pausing is only available in debug mode|n
+    F6 - Execute next instruction. Only available when paused in debug mode|n
+    F12 - Reset computer. To emulate real world resetting, all that is reset is the program counter. 
+    A well designed program should not be dependent on a clean starting state|n
+    ESC - Quits the emulator|n|n
+    
+    Input|n
+    To provide input to the computer, type the input, then hit enter. Hitting enter transfers the desired input into 
+    the I register, and sets IF. The literal value of the input is provided as a hexadecimal value in the input box.
+    If the input value is not valid, an error will be shown in the input box, and pressing enter will do nothing|n|n
+    There are several ways to enter the input:|n
+    - If a single character is entered, then the ASCII value of the character is used. e.g. the input 'd' results in 
+    the decimal value of 100|n
+    - If the input consists of multiple characters, it is interpreted as a numerical input. The first character 
+    indicates the base, and the following characters are the numerical value. Allowed bases are b, d and x for binary, 
+    decimal and hexadecimal respectively. For example, the input 'x20' is hexadecimal, so has a value of 32, while 
+    'b11000' is binary, so has a value of 24. If a base character is not given, it is interpreted as decimal. This 
+    means the leading d is optional for multi digit decimal inputs, but it is important to note that is is required for 
+    single digit inputs, as single digits are interpreted as their ASCII value. For example, '5' has a value of 53, 
+    while 'd5' has a value of 5''')
     emulator_parser.add_argument('-d', '--debug', action='store_true',
                                  help='Runs in debug mode. In debug mode, each instruction can be stepped through '
-                                      'one by one, and regester/memory contents are shown')
+                                      'one by one, and register/memory contents are shown')
     emulator_parser.add_argument('file', type=argparse.FileType('rb'),
                                  help='Binary file to execute. Must contain HADLoC machine code')
     emulator_parser.set_defaults(func=emulator.display.start)
