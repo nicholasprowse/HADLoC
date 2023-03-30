@@ -121,7 +121,7 @@ def instruction_value(instruction):
 
 def arithmetic_value(instruction):
     """
-    Deterimines the machine code value of an arithmetic or logic instruction. Returns this value if the instruction
+    Determines the machine code value of an arithmetic or logic instruction. Returns this value if the instruction
     is an arithmetic/logic command. If not, then None is returned.
 
     Raises:

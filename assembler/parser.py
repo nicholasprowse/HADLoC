@@ -1,5 +1,5 @@
 from error import CompilerException
-from cstring import CodeObject
+from text_utils import CodeObject
 
 inst_formats = {'mov': ['register', 'register'], 'opd': ['register'], 'jmp': [], 'jgt': [], 'jeq': [], 'jlt': [],
                 'jge': [], 'jle': [], 'jne': [], 'jcs': [], 'jis': [], 'opi': ['register'], 'hlt': [],
@@ -91,11 +91,11 @@ class Parser:
         # Check if there are any labels or definitions that weren't used
         for label in self.labels:
             if label not in self.used_labels:
-                warnings.append(f"The label '{label}' on line {label.line()+1} was never used")
+                warnings.append(f"The label '{label}' on line {label.text.line()+1} was never used")
 
         for definition in self.constants:
             if definition not in self.used_constants:
-                warnings.append(f"The constant '{definition}' on line {definition.line()+1} was never used")
+                warnings.append(f"The constant '{definition}' on line {definition.text.line()+1} was never used")
 
         self.instructions.append(['hlt'])
 

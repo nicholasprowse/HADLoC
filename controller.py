@@ -16,7 +16,7 @@ from error import HADLOCException
 from utils import get_file_name
 import emulator.display
 
-# TODO Serial read can raise a SerialError if the connection is lost midread. Should catch these errors
+# TODO Serial read can raise a SerialError if the connection is lost mid read. Should catch these errors
 
 
 def get_serial():
@@ -81,9 +81,10 @@ def connect_serial(device_name):
 def get_serial_from_args(args, program_name):
     """
     Gets the serial port gives an argparse args object. The args object must have the following 2 arguments
-        a: Boolean value indicating if the serial port should be found automatically
+        auto_port: Boolean value indicating if the serial port should be found automatically
         port: String containing the name of the serial port. Can be None
-    If a is False and port is None, then the user is prompted to select a serial port using the get_serial() function
+    If auto_port is False and port is None, then the user is prompted to select a serial port using the get_serial()
+    function
     Args:
         args: argparse args object with boolean value a and string value port (port can be None)
         program_name: name of the program obtained from parser.prog, used for error message
@@ -95,7 +96,7 @@ def get_serial_from_args(args, program_name):
         HADLOCException: If the given method of selecting the serial port was unsuccessful
     """
     if args.auto_port:
-        ser = find_serialport_auto()
+        ser = find_serial_port_auto()
         if ser is None:
             raise HADLOCException(HADLOCException.SERIAL,
                                   'Unable to connect to EEPROM writer. Please ensure it is connected')
@@ -143,7 +144,7 @@ def execute_assemble(args, program_name):
         print("Successfully Loaded '{}' onto EEPROM".format(get_file_name(files[0])))
 
 
-def find_serialport_auto():
+def find_serial_port_auto():
     """
     Finds the port that the EEPROM writer is connected to, and returns an open serial port connection. If no EEPROM
     writer is connected, then this returns None.
@@ -165,11 +166,12 @@ def find_serialport_auto():
             description = port.description.lower() if port.description is not None else ""
             device = port.device.lower() if port.device is not None else ""
             product = port.product.lower() if port.product is not None else ""
-            hwid = port.hwid.lower() if port.hwid is not None else ""
+            hardware_id = port.hwid.lower() if port.hwid is not None else ""
             # Check if usb is in any of these strings. The EEPROM writer is most likely one of these ports, since it
-            # must be connected through a usb port
-            if 'usb' in description + device + product + hwid:
-                # get the serial port, and print it out if it was connected succesfully (i.e. is not an integer (error))
+            # must be connected through an usb port
+            if 'usb' in description + device + product + hardware_id:
+                # get the serial port, and print it out if it was connected successfully
+                # (i.e. is not an integer (error))
                 ser = connect_serial(port.device)
                 if type(ser) is not int:
                     return ser
@@ -195,21 +197,21 @@ def execute_serialports(args):
     """
     If the '-a' argument is not set in args, then this function simply prints out a list of currently available
     serial ports. Otherwise, this function will attempt to automatically find the serial port with which the EEPROM
-    writer is connected. If found, it will print out the port, otherwise it will inform the user that a EEPROM writer
-    was not able to be found
+    writer is connected. If found, it will print out the port, otherwise it will inform the user that an EEPROM writer
+    could not be found
     Args:
-         args: command line arguments for this command. The only argument is the '-a' argument which is either
+         args: command line arguments for this command. The only argument is the '--auto_port' argument which is either
             True or False, indicating if the correct serial port should be automatically found
     """
     ports = list_ports.comports()
-    # print out the ports if a is not set
+    # print out the ports if auto_port is not set
     if not args.auto_port:
         for port in ports:
             print(port.device)
 
     # Otherwise we need to find the EEPROM writer
     else:
-        ser = find_serialport_auto()
+        ser = find_serial_port_auto()
         if ser is not None:
             print('Connection established to serial port: ')
             print(ser.port)

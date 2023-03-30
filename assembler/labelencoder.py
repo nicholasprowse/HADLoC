@@ -13,7 +13,7 @@ no longer any labels. After this stage, each instruction exactly corresponds to 
 the arguments are fully specified. 
 
 We will call ldb instructions will a label argument unresolved load instructions. Each unresolved load instruction 
-will either be assembled into 1 or 2 machine code intructions, depending on the value of the argument. Whether a 
+will either be assembled into 1 or 2 machine code instructions, depending on the value of the argument. Whether a 
 labels length is 1 or 2, depends on which 'block' the label falls into. A block is a set of 128 instructions, 
 and we label then sequentially starting at 0. If a label falls within an even block, its length will be 1, 
 and if it falls within an odd block then it will have a length of 2. This means that we cannot determine the value of 

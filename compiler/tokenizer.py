@@ -3,7 +3,7 @@ import error
 from enum import Enum
 
 from error import CompilerException
-from cstring import Code, CodeObject, PositionedString
+from text_utils import PositionedString, CodeObject, Code
 
 keywords = ['public', 'private', 'class', 'static', 'byte', 'char', 'bool', 'constructor', 'true', 'false', 'null',
             'import', 'void', 'new']
@@ -65,7 +65,7 @@ class Tokenizer:
         # advancing past any whitespace/comments at the start, before continouosly tokenizing a token, and advancing
         # over whitespace/comment
         self.skip_whitespace_and_comments()
-        while self.code.hasmore():
+        while self.code.has_more():
             if not (self.tokenize_literal() or self.tokenize_keyword() or self.tokenize_operator() or
                     self.tokenize_separator() or self.tokenize_identifier()):
                 raise CompilerException(CompilerException.SYNTAX, 'Unexpected character', self.code[0])
@@ -107,12 +107,12 @@ class Tokenizer:
             if self.code.match('//'):
                 should_continue = True
                 # Move offset to end of the current line
-                self.code.advancepast('\n')
+                self.code.advance_past('\n')
 
-            comment_start = self.code.substring_length(2)
+            comment_start = self.code.substring(length=2, relative=True)
             if self.code.match('/*'):
                 should_continue = True
-                if self.code.advancepast('*/') is None:
+                if self.code.advance_past('*/') is None:
                     raise CompilerException(error.CompilerException.SYNTAX, 'Comment not closed', comment_start)
 
     def tokenize_keyword(self):
@@ -123,7 +123,7 @@ class Tokenizer:
         Returns:
             bool: True if a keyword was tokenized, False otherwise
         """
-        word = self.code.matchany(keywords)
+        word = self.code.match(*keywords)
         if word is not None:
             return self.addtoken(Token.keyword, word)
         return False
@@ -157,7 +157,7 @@ class Tokenizer:
         Returns:
             bool: True if an operator was tokenized, False otherwise
         """
-        operator = self.code.matchany(operators)
+        operator = self.code.match(*operators)
         if operator is not None:
             return self.addtoken(Token.operator, operator)
         return False
@@ -170,7 +170,7 @@ class Tokenizer:
         Returns:
             bool: True if an separator was tokenized, False otherwise
         """
-        separator = self.code.matchany(separators)
+        separator = self.code.match(*separators)
         if separator is not None:
             return self.addtoken(Token.separator, separator)
         return False
@@ -238,7 +238,7 @@ class Tokenizer:
                 if len(exponentdigits) == 0:
                     raise CompilerException(CompilerException.SYNTAX,
                                             'Invalid floating point literal. Missing expenential digits',
-                                            self.code.substring_absolute(start))
+                                            self.code.substring(start=start))
 
         if len(exponentdigits) == 0:
             if self.code.match('e') or self.code.match('E'):
@@ -252,11 +252,11 @@ class Tokenizer:
                     print(self.code[0])
                     raise CompilerException(CompilerException.SYNTAX,
                                             'Invalid floating point literal. Missing expenential digits',
-                                            self.code.substring_absolute(start))
+                                            self.code.substring(start=start))
             else:
                 exponentdigits = '0'
 
-        return self.addtoken(Token.float, self.code.substring_absolute(start),
+        return self.addtoken(Token.float, self.code.substring(start=start),
                              (integerdigits, fractionaldigits, exponentsign, exponentdigits))
 
     def tokenize_int(self):
@@ -287,7 +287,7 @@ class Tokenizer:
             CompilerException: If the token starts with '0b' or '0B', but contains no binary digits directly after
         """
         start = self.code.offset
-        if self.code.matchany(['0b', '0B']) is None:
+        if self.code.match('0b', '0B') is None:
             return False
 
         if self.code.match('0'):
@@ -303,7 +303,7 @@ class Tokenizer:
             elif self.code.match('1'):
                 n = 2 * n + 1
             else:
-                return self.addtoken(Token.integer, self.code.substring_absolute(start), n)
+                return self.addtoken(Token.integer, self.code.substring(start=start), n)
 
     def tokenize_oct(self):
         """
@@ -319,11 +319,11 @@ class Tokenizer:
 
         n = 0
         while True:
-            char = self.code.matchrange('0', '7')
+            char = self.code.match_range('0', '7')
             if char is not None:
                 n = 8 * n + int(char)
             else:
-                return self.addtoken(Token.integer, self.code.substring_absolute(start), n)
+                return self.addtoken(Token.integer, self.code.substring(start=start), n)
 
     def tokenize_dec(self):
         """
@@ -334,17 +334,17 @@ class Tokenizer:
             (bool): True if a decimal integer was tokenized, False otherwise
         """
         start = self.code.offset
-        char = self.code.matchrange('0', '9')
+        char = self.code.match_range('0', '9')
         if char is None:
             return False
 
         n = int(char)
         while True:
-            char = self.code.matchrange('0', '9')
+            char = self.code.match_range('0', '9')
             if char is not None:
                 n = 10 * n + int(char)
             else:
-                return self.addtoken(Token.integer, self.code.substring_absolute(start), n)
+                return self.addtoken(Token.integer, self.code.substring(start=start), n)
 
     def tokenize_hex(self):
         """
@@ -359,7 +359,7 @@ class Tokenizer:
             CompilerException: If the token starts with '0x' or '0X', but contains no hexadecimal digits directly after
         """
         start = self.code.offset
-        if self.code.matchany(['0x', '0X']) is None:
+        if self.code.match('0x', '0X') is None:
             return False
 
         try:
@@ -373,7 +373,7 @@ class Tokenizer:
                 n = 16 * n + int(self.code[0])
                 self.code.advance()
             except ValueError:
-                return self.addtoken(Token.integer, self.code.substring_absolute(start), n)
+                return self.addtoken(Token.integer, self.code.substring(start=start), n)
 
     def tokenize_char(self):
         """
@@ -407,25 +407,25 @@ class Tokenizer:
                     self.code.advance(2)
                 except ValueError:
                     raise CompilerException(CompilerException.SYNTAX, 'Invalid hex escape in character literal',
-                                            self.code.substring_relative(-1, 2))
+                                            self.code.substring(start=-1, end=2, relative=True))
         else:
             character = self.code[0].text
             self.code.advance()
             if not 32 <= ord(character) <= 126:
                 raise CompilerException(CompilerException.SYNTAX,
-                                        "Invalid character. Only characters with an ACSII value between 32 (space) and "
+                                        "Invalid character. Only characters with an ASCII value between 32 (space) and "
                                         "126 (~) can be used in character literals", self.code[-1])
 
         if self.code.match("'"):
-            return self.addtoken(Token.character, self.code.substring_absolute(start), character)
+            return self.addtoken(Token.character, self.code.substring(start=start), character)
 
         if character == "'":
             raise CompilerException(CompilerException.SYNTAX,
                                     "Invalid character literal. Cannot have empty character literals",
-                                    self.code.substring_relative(-2))
+                                    self.code.substring(start=-2, relative=True))
         raise CompilerException(CompilerException.SYNTAX,
                                 "Invalid character literal. Character has no closing quotation mark",
-                                self.code.substring_relative(-2))
+                                self.code.substring(start=-2, relative=True))
 
     def tokenize_string(self):
         """
@@ -464,21 +464,21 @@ class Tokenizer:
                         self.code.advance(2)
                     except ValueError:
                         raise CompilerException(CompilerException.SYNTAX, 'Invalid hex escape in character literal',
-                                                self.code.substring_relative(-1, 2))
+                                                self.code.substring(start=-1, end=2, relative=True))
             else:
                 character = self.code.advance().text
                 string += character
                 if character == '\n':
                     raise CompilerException(CompilerException.SYNTAX,
                                             "Invalid string literal. String has no closing quotation mark",
-                                            self.code.substring_absolute(start, start + 1))
+                                            self.code.substring(start=start, length=1))
                 if not 32 <= ord(character) <= 126:
                     raise CompilerException(CompilerException.SYNTAX,
                                             "Invalid character. Only characters with an ACSII value between 32 (space) "
                                             "and 126 (~) can be used in string literals", self.code[-1])
 
         self.code.advance()
-        return self.addtoken(Token.string, self.code.substring_absolute(start), string)
+        return self.addtoken(Token.string, self.code.substring(start=start), string)
 
 
 def tokenize(file):

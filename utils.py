@@ -33,7 +33,7 @@ def verify_file(file, ext, ext_error):
     """
     Verifies that the given file name is valid, and returns a file object in read mode, along with the file name with
     the extension removed. This is useful to create new files with the same name but different extensions
-    The file name is valid if its extension matches the extesion provided in the 'ext' parameter and the file exists
+    The file name is valid if its extension matches the extension provided in the 'ext' parameter and the file exists
     If either condition is not met a FileError will be raised. If the extension is incorrect, the provided message will
     be used for the error
 
