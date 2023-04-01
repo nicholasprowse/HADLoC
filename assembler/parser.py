@@ -93,11 +93,11 @@ class Parser:
     def __init__(self, tokens: list[Token], warnings: list[str]):
         self.tokens = tokens
         self.index = 0
-        self.labels = {}
-        self.constants = {}
-        self.instructions = [['nop'], ['nop']]
-        self.used_labels = []
-        self.used_constants = []
+        self.labels: dict[CodeObject, int] = {}
+        self.constants: dict[CodeObject, CodeObject] = {}
+        self.instructions: list[list[CodeObject | str]] = [['nop'], ['nop']]
+        self.used_labels: list[CodeObject] = []
+        self.used_constants: list[CodeObject] = []
 
         self.parse_program()
 
@@ -133,18 +133,16 @@ class Parser:
             if self.index + offset < len(self.tokens) \
             else Token(TokenType.INSTRUCTION_END)
 
-    def add_instruction(self, instr):
+    def add_instruction(self, instr: list[CodeObject | str]):
         """
         Helper function to add a new instruction at the same time as returning True
 
         Args:
             instr (list): The instruction to be added. A list of CodeObjects
 
-        Returns:
-            (bool): True
+        Returns: True
         """
         self.instructions.append(instr)
-        return True
 
     def end_instruction(self, required: bool = False):
         """
@@ -187,7 +185,7 @@ class Parser:
             # If none of the above parsed successfully, there must be an error
             raise CompilerException(ExceptionType.SYNTAX, 'Unexpected Token', self.token().value)
 
-    def parse_label(self):
+    def parse_label(self) -> bool:
         """
         Parses a label. A label consists of an identifier token, followed by a label token.
         If the label is successfully parsed, index is advanced past the label, and True is returned.
@@ -195,8 +193,7 @@ class Parser:
         token. No instructions are generated from parsing a label. If the label already exists in the labels dictionary
         a CompilerException is raised. If parsing is unsuccessful then False is returned and index is not changed.
 
-        Returns:
-            True if a label was parsed, False otherwise
+        Returns: True if a label was parsed, False otherwise
 
         Raises:
             CompilerException: If parsing the label succeeds, but the identifier is defined elsewhere
@@ -211,12 +208,11 @@ class Parser:
             return True
         return False
 
-    def parse_definition(self):
+    def parse_definition(self) -> bool:
         """
         Parses a definition. A definition is the keyword 'define' followed by an identifier, then an integer.
 
-        Returns:
-            True if a definition was parsed, False otherwise
+        Returns: True if a definition was parsed, False otherwise
 
         Raise:
             CompilerException: If parsing the definition succeeds, but the identifier is defined elsewhere
@@ -247,7 +243,7 @@ class Parser:
         self.constants[name] = value
         return True
 
-    def parse_constant_expression(self) -> (TokenType, CodeObject):
+    def parse_constant_expression(self) -> tuple[TokenType, CodeObject]:
         """
         Parses a constant value. A constant is defined as
         ConstantExpression:
@@ -290,7 +286,7 @@ class Parser:
             return self.token(-1).token_type, self.token(-1).value
         return TokenType.INTEGER, self.parse_or_expression()
 
-    def parse_or_expression(self):
+    def parse_or_expression(self) -> CodeObject:
         """See docstring for parse_constant_expression"""
         value = self.parse_and_expression()
         while self.token().value == '|':
@@ -299,7 +295,7 @@ class Parser:
             value |= self.parse_and_expression()
         return value
 
-    def parse_and_expression(self):
+    def parse_and_expression(self) -> CodeObject:
         """See docstring for parse_constant_expression"""
         value = self.parse_arithmetic_expression()
         while self.token().value == '&':
@@ -308,7 +304,7 @@ class Parser:
             value &= self.parse_arithmetic_expression()
         return value
 
-    def parse_arithmetic_expression(self):
+    def parse_arithmetic_expression(self) -> CodeObject:
         """See docstring for parse_constant_expression"""
         value = self.parse_unary_expression()
         token_value = self.token().value
@@ -322,7 +318,7 @@ class Parser:
             token_value = self.token().value
         return value
 
-    def parse_unary_expression(self):
+    def parse_unary_expression(self) -> CodeObject:
         """See docstring for parse_constant_expression"""
         minus = False
         invert = False
@@ -339,7 +335,7 @@ class Parser:
             value = ~value
         return value
 
-    def parse_primary(self):
+    def parse_primary(self) -> CodeObject:
         """See docstring for parse_constant_expression"""
         value = self.token().value
         if self.token().token_type is TokenType.IDENTIFIER:
@@ -381,7 +377,7 @@ class Parser:
                                     "Unexpected token. Expected label, constant, or expression involving constants",
                                     value)
 
-    def parse_instruction(self):
+    def parse_instruction(self) -> bool:
         """
         Parses a single instruction. In this case an instruction refers to any line that produces machine code.
         Thus, this will parse everything except labels and definitions. Any tokens successfully parsed will be
@@ -418,7 +414,8 @@ class Parser:
 
             self.index += argument_count + 1
             self.end_instruction(required=True)
-            return self.add_instruction(instruction)
+            self.add_instruction(instruction)
+            return True
 
         # write the pseudo instructions ldb, ldu and lda
         instr = self.token().value
@@ -441,7 +438,8 @@ class Parser:
 
         return False
 
-    def write_load(self, instr, token_type, value, index=None):
+    def write_load(self, instr: str | CodeObject, token_type: TokenType,
+                   value: int | CodeObject, index: int | None = None) -> int:
         """
         Writes a load instruction using the value as the argument. The type and value arguments should be taken
         directly from the type and value fields in the token that represents the argument to this load instruction.
@@ -468,11 +466,11 @@ class Parser:
         Warning: This function will not advance past the token it uses as the argument (due to the way it is used in
         parse_lda).
         Args:
-            instr (str or CodeObject): string indicating the type of the load instruction. Can be either 'ldu' for load
+            instr: string indicating the type of the load instruction. Can be either 'ldu' for load
                 upper byte, or 'ldb' for load lower byte
-            token_type (str): The type of the argument. For a valid load instruction to be written, this should be equal
+            token_type: The type of the argument. For a valid load instruction to be written, this should be equal
             to 'integer' or 'identifier'. Otherwise, a CompilerException will be raised
-            value (int or CodeObject): the value of the argument. For a valid load instruction to be written, this
+            value: the value of the argument. For a valid load instruction to be written, this
                 should be an int or a CodeObject containing either an int or string. Otherwise, a CompilerException
                 will be raised
             index: The index in the instructions list to write the load instruction to. This argument is optional, and
@@ -482,11 +480,9 @@ class Parser:
             The number of instructions written. Will be either 1 or 2, depending on the value of the argument
 
         Raises:
-            Exception: If token_type is not 'integer' or 'identifier'
+            Exception: If token_type is not TokenType.INTEGER or TokenType.IDENTIFIER
         """
-        # If index is not supplied, set it to the end of the instructions list
-        if index is None:
-            index = len(self.instructions)
+        index = index if index is not None else len(self.instructions)
 
         if token_type is TokenType.IDENTIFIER:
             # If the argument is an identifier, it must be a label. Since we don't yet know the values of the labels we
@@ -522,9 +518,9 @@ class Parser:
         """
         Writes an 'lda' instruction, using the current token as the argument. 'lda' instructions compile into
 
-            ldb arg
-            mov L H
             ldu arg
+            mov L H
+            ldb arg
 
         Then, the 'ldb' instructions are further compiled using the Parser.parse_load() function.
 

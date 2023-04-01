@@ -1,3 +1,4 @@
+from assembler.parser import Parser
 from assembler.tokenizer import TokenType
 from error import CompilerException, ExceptionType
 
@@ -47,17 +48,17 @@ their maximum equal to their minimum value. If this is the case, we mark it as f
 location.
 
 The find_lengths function first calls find_deterministic_lengths, then finds all the remaining unknown label lengths 
-through trial and error. It does this by taking the first unknown label length, assuming it is 1, and then recursivly 
+through trial and error. It does this by taking the first unknown label length, assuming it is 1, and then recursively 
 calling find_deterministic_lengths with this new state. It then checks if the resulting lengths are consistent with the
 block they end up in. If they aren't, then the guess was wrong, so it tries a length of 2 for the first unknown label 
 length, and repeats the same process. 
 
 Once the label lengths have been found, all the load instructions with a label argument are rewritten with the 
-appropriate numerial argument.
+appropriate numerical argument.
 """
 
 
-def encode_labels(parser):
+def encode_labels(parser: Parser):
     """
     Rewrites the instructions in a parser, such that there are no longer any labels. Any load instructions with a label
     as an argument will be replaced by equivalent assembly instructions that load the numerical value of the location of
