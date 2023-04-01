@@ -29,7 +29,7 @@ def get_file_name(file):
     return file[len(file) - file[::-1].find('/'):].lower()
 
 
-def verify_file(file, ext, ext_error):
+def verify_file(file: TextIOWrapper, ext: str, ext_error: str):
     """
     Verifies that the given file name is valid, and returns a file object in read mode, along with the file name with
     the extension removed. This is useful to create new files with the same name but different extensions
@@ -38,9 +38,9 @@ def verify_file(file, ext, ext_error):
     be used for the error
 
     Args:
-        file: (str) File object containing the file
-        ext: (str) The extension that the given file must have
-        ext_error: (str) The error message to display if the provided file doen't have the required extension
+        file: File object containing the file
+        ext: The extension that the given file must have
+        ext_error: The error message to display if the provided file doesn't have the required extension
 
     Return:
         name: (TextIOWrapper, str) file is a file object of the given file, opened in read mode. name is the full

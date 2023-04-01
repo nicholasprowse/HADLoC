@@ -22,12 +22,9 @@ class Code:
         relative to this offset
     """
 
-    def __init__(self, text: str | PositionedString):
+    def __init__(self, text: str):
         self.offset = 0
-
-        if isinstance(text, str):
-            text = PositionedString.create_string(text, keep_ends=True)
-        self.text = text
+        self.text = PositionedString.create_string(text)
 
     def substring(self, start: int | None = None, end: int | None = None,
                   length: int | None = None, relative: bool = False) -> PositionedString:
@@ -160,9 +157,12 @@ class Code:
 
 class LinedCode(Code):
     """
-    Behaves exactly the same as a Code object, but it respects line boundaries.
-    This means that no functions will advance past line boundaries except the advance_line() function.
-    This allows tokenizers to easily find line boundaries, as they must acknowledge them to continue advancing.
+    Behaves exactly the same as a Code object, but it respects line boundaries. At any time, the Code object behaves as
+    though all that exists is the current line. For example, if you try to substring beyond a line boundary, all you
+    will get is the text on the current line. Similarly, you cannot advance past a line boundary using the advance or
+    match functions. The object is only 'aware' of the current line. has_more, advance_line and skip_line are the only
+    functions that are 'aware' of text beyond the current line. Use skip_line to unconditionally move to the next line,
+    while advance_line can be used to move to the next line if and only if the current line is complete
 
     Args:
         text : The text of the code. Trailing and leading whitespace on each line will be removed
@@ -172,7 +172,7 @@ class LinedCode(Code):
             now, while remaining_text contains everything after that
     """
 
-    def __init__(self, text: str | PositionedString):
+    def __init__(self, text: str):
         super().__init__(text)
         self.remaining_text: PositionedString = self.text
         self.advance_line()
@@ -217,7 +217,3 @@ class LinedCode(Code):
     def has_more(self) -> bool:
         """Returns True if there are more characters left to process"""
         return super().has_more() or len(self.remaining_text) > 0
-
-    def __len__(self) -> int:
-        """Returns the length of the code after (and including the offset)"""
-        return len(self.remaining_text) + len(self.text) - self.offset

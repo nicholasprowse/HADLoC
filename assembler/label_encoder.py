@@ -1,4 +1,5 @@
-from error import CompilerException
+from assembler.tokenizer import TokenType
+from error import CompilerException, ExceptionType
 
 # TODO As yet this cannot handle situations that are unsolvable without nop's
 # For example: if there is a label at instruction 255 with a single ldb instruction before it
@@ -74,7 +75,7 @@ def encode_labels(parser):
     _, finished = find_lengths(labels, finished, instructions)
 
     if len(finished) < len(labels):
-        raise CompilerException(CompilerException.NAME, 'Not able to resolve label locations', 0)
+        raise CompilerException(ExceptionType.NAME, 'Not able to resolve label locations', 0)
     else:
         for i in range(len(instructions)-1, -1, -1):
             instruction = instructions[i]
@@ -82,7 +83,7 @@ def encode_labels(parser):
             # not an integer it should be in finished
             if (instruction[0] == 'ldu' or instruction[0] == 'ldb') and instruction[1] in finished:
                 del instructions[i]
-                parser.write_load(instruction[0], 'integer', finished[instruction[1]], i)
+                parser.write_load(instruction[0], TokenType.INTEGER, finished[instruction[1]], i)
 
 
 def find_lengths(labels, finished, instructions):

@@ -39,20 +39,15 @@ class PositionedString:
         self.coordinates = coordinates
 
     @classmethod
-    def create_string(cls, text: str = '', line: int = 0, keep_ends: bool = True) -> Self:
+    def create_string(cls, text: str = '', line: int = 0) -> Self:
         """
         Creates a PositionedString from a str. Automatically determines the line numbers and character positions based
-        on new line characters
+        on new line characters. Line break characters are removed, as line breaks can be inferred from the coordinates
         Args:
             text: String representing some text. New line characters are used to determine line numbers of characters
             line: The line number to start at. By default, this is 0
-            keep_ends: Whether the new line characters at the end of each line should be kept or removed. If keep_ends
-                is true, then all line break characters will be converted to \n for consistency. Defaults to True,
-                meaning the new line characters are kept
         """
         lines = text.splitlines(keepends=False)
-        if keep_ends:
-            lines = [f'{line}\n' for line in lines[:-1]] + [lines[-1]]
         text = ''
         coordinates = []
         for i in range(len(lines)):
