@@ -59,10 +59,10 @@ class CompilerException(HADLOCException):
     """
     file_name = ''
 
-    def __init__(self, error_type: ExceptionType, msg: str, value: CodeObject | PositionedString):
+    def __init__(self, error_type: ExceptionType, msg: str, value: PositionedString):
         self.error_type = error_type
         self.msg = msg
-        self.value = value.text if isinstance(value, CodeObject) else value
+        self.value = value
 
     def display(self):
         """
@@ -70,8 +70,8 @@ class CompilerException(HADLOCException):
         a pointer to the offending character, the file in which the error occurred, the type of the error,
         and the error message.
         """
-        print_error("{} Error in '{}', line {}"
-                    .format(self.error_type, utils.get_file_name(CompilerException.file_name), self.value.line() + 1))
+        print_error(f"{self.error_type.value} Error in '{utils.get_file_name(CompilerException.file_name)}', "
+                    f"line {self.value.line() + 1}")
         print_error(code[self.value.line()].replace('\t', ' ' * 4))
         # count tabs before the character
         tabs = 0
@@ -81,7 +81,7 @@ class CompilerException(HADLOCException):
         print_error(' ' * (self.value.coordinates[0].column + 3 * tabs),
                     '^' * (self.value.coordinates[-1].column - self.value.coordinates[0].column + 1), sep='')
 
-        print_error(self.error_type, " Error: ", self.msg, sep='')
+        print_error(self.error_type.value, " Error: ", self.msg, sep='')
         return True
 
 

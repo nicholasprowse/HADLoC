@@ -2,7 +2,6 @@
 import sys
 import os
 
-
 import argparse
 import textwrap
 from serial.tools import list_ports
@@ -12,9 +11,10 @@ import serial
 import writer
 from assembler.assembler import assemble
 from compiler.compiler import jcompile
-from error import HADLOCException
+from error import HADLOCException, ExceptionType
 from utils import get_file_name
 import emulator.display
+
 
 # TODO Serial read can raise a SerialError if the connection is lost mid read. Should catch these errors
 
@@ -51,7 +51,7 @@ def get_serial():
     if len(response) != 0:
         print(response, end="")
     else:
-        raise HADLOCException(HADLOCException.SERIAL,
+        raise HADLOCException(ExceptionType.SERIAL,
                               f"Could not establish connection with the port '{ports[int(choice) - 1].device}'")
     return ser
 
@@ -98,16 +98,16 @@ def get_serial_from_args(args, program_name):
     if args.auto_port:
         ser = find_serial_port_auto()
         if ser is None:
-            raise HADLOCException(HADLOCException.SERIAL,
+            raise HADLOCException(ExceptionType.SERIAL,
                                   'Unable to connect to EEPROM writer. Please ensure it is connected')
     elif args.port is not None:
         ser = connect_serial(args.port)
         if ser == INCORRECT_PORT_ERROR:
-            raise HADLOCException(HADLOCException.SERIAL,
+            raise HADLOCException(ExceptionType.SERIAL,
                                   "No EEPROM writer connected to serial port: '{}'. Please make sure the EEPROM "
                                   "writer is connected, and you select the correct serial port".format(args.port))
         elif ser == PORT_DOES_NOT_EXIST_ERROR:
-            raise HADLOCException(HADLOCException.SERIAL,
+            raise HADLOCException(ExceptionType.SERIAL,
                                   "The serial port '{}' does not exist. For a list of current "
                                   "serial ports use '{} serialports'".format(args.port, program_name))
     else:
@@ -217,8 +217,8 @@ def execute_serialports(args):
             print(ser.port)
             ser.close()
         else:
-            raise HADLOCException(HADLOCException.SERIAL, 'Unable to connect to EEPROM writer. '
-                                                          'Please ensure it is connected')
+            raise HADLOCException(ExceptionType.SERIAL, 'Unable to connect to EEPROM writer. '
+                                                        'Please ensure it is connected')
 
 
 class MultilineFormatter(argparse.HelpFormatter):

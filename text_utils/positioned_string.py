@@ -116,9 +116,9 @@ class PositionedString:
         raise ValueError("invalid literal for int() with base 16: '" + char + "'")
 
     def __eq__(self, other: Any) -> bool:
-        if type(other) == str:
+        if isinstance(other, str):
             return self.text == other
-        if type(other) == PositionedString:
+        if isinstance(other, PositionedString):
             return self.text == other.text
         return False
 
@@ -129,28 +129,20 @@ class PositionedString:
             return self.text != other.text
         return True
 
-    def __lt__(self, other: str | Self) -> bool:
+    def __lt__(self, other) -> bool:
         return str(self) < str(other)
 
-    def __gt__(self, other: str | Self) -> bool:
+    def __gt__(self, other) -> bool:
         return str(self) > str(other)
 
-    def __le__(self, other: str | Self) -> bool:
+    def __le__(self, other) -> bool:
         return str(self) <= str(other)
 
-    def __ge__(self, other: str | Self) -> bool:
+    def __ge__(self, other) -> bool:
         return str(self) >= str(other)
 
-    def __add__(self, other: str | Self) -> Self:
-        """
-        If adding a regular string, and the last coordinate in this string is (line, col), then all characters in the
-        string to be added will get the coordinates (line, col + 1). Otherwise, if adding a PositionedString, it
-        works as you would expect
-        """
-        if isinstance(other, str):
-            line = self.coordinates[-1].line if len(self) > 0 else 0
-            column = self.coordinates[-1].column + 1 if len(self) > 0 else 0
-            other = PositionedString(other, [Coordinate(line, column)] * len(other))
+    def __add__(self, other) -> Self:
+        assert isinstance(other, PositionedString)
         return PositionedString(self.text + other.text, self.coordinates + other.coordinates)
 
     def __getitem__(self, key: slice | int):

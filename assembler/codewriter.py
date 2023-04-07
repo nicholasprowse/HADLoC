@@ -1,4 +1,4 @@
-from error import CompilerException
+from error import CompilerException, ExceptionType
 import writer
 
 
@@ -22,19 +22,19 @@ def write_code(instructions, file_name):
         The names of the 3 files created, in a list, where name of the raw binary file will always be the first element
         in the list.
     """
-    machinecode = [0] * len(instructions)
+    machine_code = [0] * len(instructions)
     for i in range(len(instructions)):
-        machinecode[i] = instruction_value(instructions[i])
+        machine_code[i] = instruction_value(instructions[i])
 
     files = [file_name + '.bin', file_name + '_hex.txt', file_name + '_bin.txt']
     file = open(files[0], 'wb')
-    file.write(bytes(machinecode))
+    file.write(bytes(machine_code))
     file.close()
 
     file = open(files[1], 'w')
-    writer.display(file, machinecode, 'hex')
+    writer.display(file, machine_code, 'hex')
     file = open(files[2], 'w')
-    writer.display(file, machinecode, 'bin')
+    writer.display(file, machine_code, 'bin')
 
     return files
 
@@ -68,7 +68,7 @@ def instruction_value(instruction):
         instruction (list): The instruction to determine the machine code value of
 
     Returns:
-         The machine code value of the instruction. This will be an 8 bit integer
+         The machine code value of the instruction. This will be an 8-bit integer
     """
     command = instruction[0]
     if command in fixed:
@@ -82,11 +82,11 @@ def instruction_value(instruction):
     if command == 'mov':
         src, dst = instruction[1], instruction[2]
         if dst == 'I':
-            raise CompilerException(CompilerException.ARG,
+            raise CompilerException(ExceptionType.ARG,
                                     "Cannot move into the 'I' register. The 'I' register is read only", instruction[2])
 
         if src == 'H':
-            raise CompilerException(CompilerException.ARG,
+            raise CompilerException(ExceptionType.ARG,
                                     "Cannot move out of the 'H' register. The 'H' register write only", instruction[1])
 
         s = 0
@@ -103,7 +103,7 @@ def instruction_value(instruction):
 
     if command in ['opd', 'opi']:
         if instruction[1] in ['Y' or 'H']:
-            raise CompilerException(CompilerException.ARG,
+            raise CompilerException(ExceptionType.ARG,
                                     "The '{}' register cannot be used as the argument to the '{}' instruction"
                                     .format(instruction[1], command), instruction[1])
         d = 1 if command == 'opd' else 0
@@ -114,7 +114,7 @@ def instruction_value(instruction):
         return arithmetic
 
     # In theory this is never reached, as all invalid instructions should have been caught in the tokenizing,
-    # parsing and codewriting stage
+    # parsing and code writing stage
     raise Exception("This instruction {} was not able to be encoded, and no error could be found in it. Please"
                     " update the assembler to handle this instruction".format(instruction))
 
@@ -137,12 +137,12 @@ def arithmetic_value(instruction):
 
     dst, arg1 = instruction[1], instruction[2]
     if dst not in ['X', 'L']:
-        raise CompilerException(CompilerException.ARG, "The destination register of arithmetic and logic instructions "
-                                                       "must be 'X' or 'L'", dst)
+        raise CompilerException(ExceptionType.ARG, "The destination register of arithmetic and logic instructions "
+                                                   "must be 'X' or 'L'", dst)
 
     if arg1 in ['I', 'Y', 'H']:
-        raise CompilerException(CompilerException.ARG, "The '{}' register cannot be used as an argument for the "
-                                                       "arithmetic and logic instructions".format(arg1), arg1)
+        raise CompilerException(ExceptionType.ARG, "The '{}' register cannot be used as an argument for the "
+                                                   "arithmetic and logic instructions".format(arg1), arg1)
 
     x = 1 if dst == 'X' else 0
     m = 1 if arg1 == 'M' else 0
@@ -152,17 +152,17 @@ def arithmetic_value(instruction):
 
     arg2 = instruction[3]
     if arg2 in ['I', 'Y', 'H']:
-        raise CompilerException(CompilerException.ARG, "The '{}' register cannot be used as an argument for the "
-                                                       "arithmetic and logic instructions".format(arg2), arg2)
+        raise CompilerException(ExceptionType.ARG, "The '{}' register cannot be used as an argument for the "
+                                                   "arithmetic and logic instructions".format(arg2), arg2)
     if arg2 == 'M':
         m = 1
 
     if arg1 == arg2 == 'X':
-        raise CompilerException(CompilerException.ARG,
+        raise CompilerException(ExceptionType.ARG,
                                 "'X' cannot be both arguments in arithmetic and logic instructions", arg2)
 
     if arg1 != 'X' and arg2 != 'X':
-        raise CompilerException(CompilerException.ARG,
+        raise CompilerException(ExceptionType.ARG,
                                 "Arithmetic and logic instructions must have at least one argument be 'X'", arg1)
 
     if instruction[0] == 'sub':

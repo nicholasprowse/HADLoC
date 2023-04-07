@@ -1,8 +1,7 @@
 import os
-from dataclasses import dataclass
 from enum import Enum, auto
 from io import TextIOWrapper
-from typing import Any, Optional
+from typing import Optional
 
 import error
 
@@ -26,10 +25,10 @@ class TokenType(Enum):
     INSTRUCTION_END = auto()
 
 
-@dataclass
-class Token:
-    token_type: TokenType
-    value: Optional[CodeObject] = None
+class Token(CodeObject):
+    def __init__(self, token_type: TokenType, value: CodeObject = CodeObject.none()):
+        super().__init__(value.value, value)
+        self.token_type = token_type
 
 
 class Tokenizer:
@@ -61,6 +60,7 @@ class Tokenizer:
         CompilerException: If there is a syntax error in the assembly code, a Compiler exception will be raised
         containing the location and cause of the error
     """
+
     def __init__(self, text: str):
         self.code = LinedCode(text)
         # tokens = (type, value)
@@ -78,7 +78,7 @@ class Tokenizer:
                 raise CompilerException(ExceptionType.SYNTAX, 'Unexpected character', self.code[0])
             self.skip_whitespace_and_comments()
 
-    def addtoken(self, token_type: TokenType, text: PositionedString, value: Any = None) -> Token:
+    def addtoken(self, token_type: TokenType, text: PositionedString, value: Optional[int | str] = None) -> Token:
         """
         Helper function to add a new token at the same time as returning True. The text and value arguments are wrapped
         in a CodeObject. If value is not provided, it will be set to the value of text.
@@ -96,7 +96,7 @@ class Tokenizer:
         value = value if value is not None else text.text
 
         # Add INSTRUCTION_END if the new token is on a different line to the previous one
-        if len(self.tokens) > 0 and self.tokens[-1].value.text.line() != text.line():
+        if len(self.tokens) > 0 and self.tokens[-1].line() != text.line():
             self.tokens.append(Token(TokenType.INSTRUCTION_END))
 
         self.tokens.append(Token(token_type, CodeObject(value, text)))
