@@ -74,7 +74,7 @@ def read_data_from_txt(file):
     """
     Reads the binary data in the given text file. The file must be a text file.
     Only the characters '0' and '1' are read, everything else is ignored.
-    The '0's and '1's are converted into 8 bit binary numbers and returned as a byte array.
+    The '0's and '1's are converted into 8-bit binary numbers and returned as a byte array.
     If the total number of binary digits is not a multiple of 8, the final byte is padded with zeroes.
     Args:
         file (File): The file to read

@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from text_utils import PositionedString
 
-# TODO As yet this cannot handle situations that are unsolvable without nop's
+# TODO As yet this cannot handle situations that are unsolvable without nop
 # For example: if there is a label at instruction 255 with a single ldb instruction before it
 # If we assume the ldb instruction has a length of 1, then the label will be at 255 which requires 2 instructions
 # If we assume the ldb instruction has a length of 2, then the label will be at 256 which only needs a single
@@ -25,7 +25,7 @@ any label after load instruction with a label argument, because we don't know ex
 will assemble into before it.  To solve this we use the following algorithm: 
 
 Each label is assigned 4 values. The first is the original location, which is the location of the label when the 
-parser is originally passed in. Thus, this is the value you would get if you assume all uncresolved load instructions 
+parser is originally passed in. Thus, this is the value you would get if you assume all unresolved load instructions 
 assemble into 1 machine code instruction. The second and third values are the minimum and maximum possible locations 
 that the label could possibly be. These are found by assuming all unresolved load instructions assemble into 1 (for 
 minimum) or 2 (for maximum) machine code instructions. The final value we assign to each label is its length. This is 

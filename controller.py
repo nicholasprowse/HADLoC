@@ -10,7 +10,6 @@ import serial
 
 import writer
 from assembler.assembler import assemble
-from compiler.compiler import jcompile
 from error import HADLOCException, ExceptionType
 from utils import get_file_name
 import emulator.display
@@ -364,24 +363,6 @@ def main():
             args.func(args)
         except HADLOCException as exception:
             exception.display()
-
-
-def test():
-    f = open("/Users/nicholasprowse/Documents/Programming/HADLoC Programs/J test/test.j")
-    try:
-        jcompile(f)
-    except HADLOCException as he:
-        he.display()
-    f.close()
-
-
-def assemble_test():
-    f = open("/Users/nicholasprowse/Documents/Programming/HADLoC Programs/test/test.hdc")
-    try:
-        assemble(f)
-    except HADLOCException as he:
-        he.display()
-    f.close()
 
 
 if __name__ == "__main__":

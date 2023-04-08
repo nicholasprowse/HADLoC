@@ -22,8 +22,10 @@ class Parser:
     here, and a CompilerException will be raised. All errors are caught here, so no error checking is required in
     later stages. It also means later stages no longer need a reference to the source code, so the returned instructions
     are raw strings and ints, not PositionedStrings or CodeObjects. Furthermore, the parser will generate a list of
-    warnings. Warnings are generated when a label or definition is created but not used, so it could be safely
-    deleted from the source code
+    warnings. Warnings are generated in the following situations
+        - A label or definition is defined but not used, so it could be safely deleted from the source code
+        - A move instruction is used with the same source and destination. This has no effect so could be removed or
+            replaced with a nop. The Parser will replace this with a nop
 
     Args:
         tokens: A list containing the tokens generated from the source code of an assembly file. This should be
@@ -162,7 +164,7 @@ class Parser:
                 continue
 
             # If none of the above parsed successfully, there must be an error
-            raise CompilerException(ExceptionType.SYNTAX, self.token().value, 'Unexpected Token')
+            raise CompilerException(ExceptionType.SYNTAX, self.token(), 'Unexpected Token')
 
     def parse_label(self) -> bool:
         """
@@ -295,13 +297,22 @@ class Parser:
 
     def parse_move_instruction(self) -> bool:
         """
-        Parses a move instruction
+        Parses a move instruction. Generates a warning if source and destination are equal. This has no effect, so is
+        replaced with a nop
         Returns: True if an instruction was parsed
         """
         if self.match('mov') is None:
             return False
 
         src, dst = self.verify_registers('mov', 2)
+        if src == dst:
+            self.warnings.append(
+                f"Move command on line {src.line()} used with '{src}' as the source and destination register. "
+                f"This has no effect and has been replaced with 'nop'"
+            )
+            self.add_instruction(['nop'])
+            return True
+
         if dst == 'I':
             raise CompilerException(ExceptionType.ARG, dst,
                                     "Cannot move into the 'I' register. The 'I' register is read only")
@@ -551,8 +562,11 @@ def parse(tokens: list[Token]) -> tuple[list[list[str | int]], list[str], dict[s
     here, and a CompilerException will be raised. All errors are caught here, so no error checking is required in
     later stages. It also means later stages no longer need a reference to the source code, so the returned instructions
     are raw strings and ints, not PositionedStrings or CodeObjects. Furthermore, the parser will generate a list of
-    warnings. Warnings are generated when a label or definition is created but not used, so it could be safely
-    deleted from the source code
+    warnings. Warnings are generated in the following situations
+        - A label or definition is defined but not used, so it could be safely deleted from the source code
+        - A move instruction is used with the same source and destination. This has no effect so could be removed or
+            replaced with a nop. The Parser will replace this with a nop
+            
     Args:
         tokens: A list containing the tokens generated from the source code of an assembly file. This should be
             created using tokenizer.tokenize(text)

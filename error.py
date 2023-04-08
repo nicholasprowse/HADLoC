@@ -2,7 +2,7 @@ import sys
 from enum import Enum
 
 import utils
-from text_utils import CodeObject, PositionedString
+from text_utils import PositionedString
 
 code = ['']
 
