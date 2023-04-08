@@ -9,7 +9,7 @@ from serial import SerialException
 import serial
 
 import writer
-from assembler.assembler import assemble
+from assembler import assemble
 from error import HADLOCException, ExceptionType
 from utils import get_file_name
 import emulator.display
@@ -130,10 +130,10 @@ def execute_read(args, program_name):
 
 def execute_assemble(args, program_name):
     warnings, files = assemble(args.file)
-    print("Successfully Assembled '{}' with {} warning{}".format(get_file_name(args.file), len(warnings),
-                                                                 '' if len(warnings) == 1 else 's'), flush=True)
+    print(f"Successfully Assembled '{get_file_name(args.file)}' with "
+          f"{len(warnings)} warning{'' if len(warnings) == 1 else 's'}", flush=True)
     for warning in warnings:
-        print(warning)
+        print(f"Warning: {warning}")
 
     if args.clean:
         for i in range(1, len(files)):

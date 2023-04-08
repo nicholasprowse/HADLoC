@@ -33,22 +33,18 @@ class Token(CodeObject):
 
 class Tokenizer:
     """
-    Tokenizes an assembly file. Takes the raw text from the assembly file as a string, and generates a 2 dimensional
-    list of tokens, stored in the variable tokens. The tokens list is structured so that each line in the code is
-    in a separate row of the 2 dimensional list. Each row contains a series of tokens, stored as tuples. The first
-    element of the tokens is the type of the token, stored as a string, and the second element is the value.
+    Used for tokenizing an assembly file. Takes the raw text from the assembly file as a string, and generates a 2
+    dimensional list of tokens, stored in the variable tokens. The tokens list is structured so that each line in the
+    code is in a separate row of the 2 dimensional list. Each row contains a series of tokens, stored as tuples. The
+    first element of the tokens is the type of the token, stored as a string, and the second element is the value.
 
     There are 5 types of token: 'keyword', 'identifier', 'register', 'label', 'integer'
 
     More information about what constitutes each type of token can be found in the documentation for the functions
     that tokenize them (e.g. Tokenizer.tokenize_label()).
 
-    The value of the token is stored as a CodeObject. This CodeObject stores both the value of the token, and the
-    original text that created the token as a PositionedString. This means that if an error is created, we can determine
-    exactly where that token was in the code.
-
     Args:
-        text: the raw text to be tokenized, obtained from the assembly file, stored as a string
+        file: An open file of the file to be tokenized. Must be in the mode 'r'
 
     Attributes:
         code (LinedCode): The code that is being tokenized. This object stored the current location within the text
@@ -60,12 +56,19 @@ class Tokenizer:
         CompilerException: If there is a syntax error in the assembly code, a Compiler exception will be raised
         containing the location and cause of the error
     """
-
-    def __init__(self, text: str):
+    def __init__(self, file: TextIOWrapper):
+        text = file.read()
+        error.code = text.splitlines()
+        CompilerException.file_name = os.path.realpath(file.name)
         self.code = LinedCode(text)
-        # tokens = (type, value)
         self.tokens: list[Token] = []
+        file.close()
 
+    def run(self) -> list[Token]:
+        """
+        Performs the tokenization and returns the tokens as a list
+        Returns: The list of tokens generated
+        """
         # The code should be a series of alternating tokens and whitespace/comment sections. As such, we start by
         # advancing past any whitespace/comments at the start, before continuously tokenizing a token, and advancing
         # over whitespace/comment. If we advanced over a line when tokenizing a whitespace/comment, we must check if
@@ -77,6 +80,7 @@ class Tokenizer:
                     self.tokenize_symbol() is None:
                 raise CompilerException(ExceptionType.SYNTAX, self.code[0], 'Unexpected character')
             self.skip_whitespace_and_comments()
+        return self.tokens
 
     def addtoken(self, token_type: TokenType, text: PositionedString, value: Optional[int | str] = None) -> Token:
         """
@@ -90,8 +94,7 @@ class Tokenizer:
                 integer, value would be an int, that is the value of the token. If value is not passed, it gets set to
                 text. This must be an int, or str type
 
-        Returns:
-            (bool): True
+        Returns: The token added
         """
         value = value if value is not None else text.text
 
@@ -317,31 +320,3 @@ class Tokenizer:
                 ExceptionType.SYNTAX, self.code[-2],
                 "Invalid character literal. Only characters with an ASCII value from 32 to 126 are allowed"
             )
-
-
-def tokenize(file: TextIOWrapper) -> list[Token]:
-    """
-    Tokenizes an assembly file and returns the tokens. Takes the raw text from the assembly file as an open file object,
-    and generates a 2 dimensional list of tokens. The tokens list is structured so that each line in the code is
-    in a separate row of the 2 dimensional list. Each row contains a series of tokens, stored as tuples. The first
-    element of the tokens is the type of the token, stored as a string, and the second element is the value.
-
-    There are 5 types of token: 'keyword', 'identifier', 'register', 'label', 'integer'
-
-    More information about what constitutes each type of token can be found in the documentation for the functions
-    that tokenize them (e.g. Tokenizer.tokenize_label()).
-
-    The value of the token is stored as a CodeObject. This CodeObject stores both the value of the token, and the
-    original text that created the token as a PositionedString. This means that if an error is created, we can determine
-    exactly where that token was in the code.
-
-    Args:
-        file: An open file of the file to be tokenized. Must be in the mode 'r'.
-
-    Returns: A two-dimensional list containing the tokens on each line. Each token is stored
-            in a tuple containing the type of the token as a string, and the value of the token as a CodeObject
-    """
-    code = file.read()
-    error.code = code.splitlines()
-    CompilerException.file_name = os.path.realpath(file.name)
-    return Tokenizer(code).tokens
