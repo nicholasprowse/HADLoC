@@ -65,7 +65,7 @@ class Parser:
         # used, so they are caught during parsing
         for label in self.used_labels:
             if label.value not in self.labels:
-                raise CompilerException(ExceptionType.NAME, f"The identifier '{label}' has not been defined", label)
+                raise CompilerException(ExceptionType.NAME, label, f"The identifier '{label}' has not been defined")
 
         # Check if there are any labels or definitions that weren't used
         for label in self.labels:
@@ -105,7 +105,7 @@ class Parser:
         if self.token().token_type is TokenType.INSTRUCTION_END:
             self.index += 1
         elif required:
-            raise CompilerException(ExceptionType.SYNTAX, 'Unexpected Token', self.token())
+            raise CompilerException(ExceptionType.SYNTAX, self.token(), 'Unexpected Token')
 
     def add_instruction(self, instruction: list[PositionedString | str | int | None]):
         """
@@ -162,7 +162,7 @@ class Parser:
                 continue
 
             # If none of the above parsed successfully, there must be an error
-            raise CompilerException(ExceptionType.SYNTAX, 'Unexpected Token', self.token().value)
+            raise CompilerException(ExceptionType.SYNTAX, self.token().value, 'Unexpected Token')
 
     def parse_label(self) -> bool:
         """
@@ -179,8 +179,9 @@ class Parser:
         """
         if self.token().token_type is TokenType.IDENTIFIER and self.token(1).value == ':':
             if self.token().value in self.labels or self.token().value in self.definitions:
-                raise CompilerException(ExceptionType.NAME, f"The identifier '{self.token().value}' has multiple "
-                                                            f"definitions", self.token().value)
+                raise CompilerException(ExceptionType.NAME, self.token().value,
+                                        f"The identifier '{self.token().value}' has multiple definitions")
+
             self.labels[self.token()] = len(self.instructions)
             self.index += 2
             self.end_instruction()
@@ -200,13 +201,13 @@ class Parser:
             return False
 
         if not self.token(1).token_type is TokenType.IDENTIFIER:
-            raise CompilerException(ExceptionType.ARG,
-                                    "Expected identifier after a 'define' keyword", self.token(1).value)
+            raise CompilerException(ExceptionType.ARG, self.token(1).value,
+                                    "Expected identifier after a 'define' keyword")
 
         name = self.token(1)
         if name.value in self.labels or name.value in self.definitions:
-            raise CompilerException(ExceptionType.NAME, f"The identifier '{name}' has multiple "
-                                                        f"definitions", name)
+            raise CompilerException(ExceptionType.NAME, name, f"The identifier '{name}' has multiple definitions")
+
         self.index += 2
         try:
             value = self.parse_constant_expression()
@@ -215,13 +216,15 @@ class Parser:
             raise ce
 
         if value is None:
-            raise CompilerException(ExceptionType.SYNTAX, "Expected constant expression as argument to the "
-                                                          "'define' instruction", self.token().value)
+            raise CompilerException(ExceptionType.SYNTAX, self.token().value,
+                                    "Expected constant expression as argument to the 'define' instruction")
 
         if type(value.value) is str:
-            raise CompilerException(ExceptionType.NAME,
-                                    f"Invalid name, '{value}', used in expression. Constants must be defined before "
-                                    f"they are used, and labels cannot be used in definitions", value)
+            raise CompilerException(
+                ExceptionType.NAME, value,
+                f"Invalid name, '{value}', used in expression. Constants must be defined before they are used, and "
+                f"labels cannot be used in definitions"
+            )
 
         self.end_instruction(required=True)
         self.definitions[name] = value.value
@@ -300,18 +303,12 @@ class Parser:
 
         src, dst = self.verify_registers('mov', 2)
         if dst == 'I':
-            raise CompilerException(
-                ExceptionType.ARG,
-                "Cannot move into the 'I' register. The 'I' register is read only",
-                dst
-            )
+            raise CompilerException(ExceptionType.ARG, dst,
+                                    "Cannot move into the 'I' register. The 'I' register is read only")
 
         if src == 'H':
-            raise CompilerException(
-                ExceptionType.ARG,
-                "Cannot move out of the 'H' register. The 'H' register write only",
-                src
-            )
+            raise CompilerException(ExceptionType.ARG, src,
+                                    "Cannot move out of the 'H' register. The 'H' register write only")
 
         self.add_instruction(['mov', src, dst])
         return True
@@ -328,9 +325,8 @@ class Parser:
         src, = self.verify_registers(command, 1)
         if src in ['Y', 'H']:
             raise CompilerException(
-                ExceptionType.ARG,
-                f"The '{src}' register cannot be used as the argument to the '{command}' instruction",
-                src
+                ExceptionType.ARG, src,
+                f"The '{src}' register cannot be used as the argument to the '{command}' instruction"
             )
 
         self.add_instruction([command, src])
@@ -351,33 +347,23 @@ class Parser:
             dst, arg1, arg2 = self.verify_registers(command, 3)
 
         if dst not in ['X', 'L']:
-            raise CompilerException(
-                ExceptionType.ARG,
-                "The destination register of arithmetic and logic instructions must be 'X' or 'L'",
-                dst
-            )
+            raise CompilerException(ExceptionType.ARG, dst,
+                                    "The destination register of arithmetic and logic instructions must be 'X' or 'L'")
 
         for arg in [arg1, arg2]:
             if arg in ['I', 'Y', 'H']:
                 raise CompilerException(
-                    ExceptionType.ARG,
-                    f"The '{arg}' register cannot be used as an argument for the arithmetic and logic instructions",
-                    arg
+                    ExceptionType.ARG, arg,
+                    f"The '{arg}' register cannot be used as an argument for the arithmetic and logic instructions"
                 )
 
         if arg1 == arg2 == 'X':
-            raise CompilerException(
-                ExceptionType.ARG,
-                "'X' cannot be both arguments in arithmetic and logic instructions",
-                command + arg2
-            )
+            raise CompilerException(ExceptionType.ARG, command + arg2,
+                                    "'X' cannot be both arguments in arithmetic and logic instructions")
 
         if arg1 != 'X' and arg2 is not None and arg2 != 'X':
-            raise CompilerException(
-                ExceptionType.ARG,
-                "Arithmetic and logic instructions must have at least one argument be 'X'",
-                command + arg2
-            )
+            raise CompilerException(ExceptionType.ARG, command + arg2,
+                                    "Arithmetic and logic instructions must have at least one argument be 'X'")
 
         self.add_instruction([command, dst, arg1, arg2])
         return True
@@ -399,18 +385,12 @@ class Parser:
         tokens = tuple(self.token(i) for i in range(count))
         for i, token in enumerate(tokens):
             if token.token_type is TokenType.INSTRUCTION_END:
-                raise CompilerException(
-                    ExceptionType.ARG,
-                    f"Expected {count} register arguments in '{command}' instruction",
-                    command + self.token(i - 1)
-                )
+                raise CompilerException(ExceptionType.ARG, command + self.token(i - 1),
+                                        f"Expected {count} register arguments in '{command}' instruction")
 
             if token.token_type is not TokenType.REGISTER:
-                raise CompilerException(
-                    ExceptionType.ARG,
-                    f"Expected register for argument {i + 1} in '{command}' instruction",
-                    self.token(i)
-                )
+                raise CompilerException(ExceptionType.ARG, self.token(i),
+                                        f"Expected register for argument {i + 1} in '{command}' instruction")
 
         self.index += count
         return tokens
@@ -519,14 +499,16 @@ class Parser:
                 self.index += 1
                 self.used_definitions.add(token)
                 return CodeObject(self.definitions[token.value], token)
-            raise CompilerException(ExceptionType.NAME,
-                                    f"Invalid name, '{token}', used in expression. Constants must be defined "
-                                    f"before they are used, and labels cannot be used in expressions", token)
+            raise CompilerException(
+                ExceptionType.NAME, token,
+                f"Invalid name, '{token}', used in expression. Constants must be defined before they are used, and "
+                f"labels cannot be used in expressions"
+            )
 
         if self.token().token_type is TokenType.INTEGER:
             if not -32768 <= token.value < 65536:
-                raise CompilerException(ExceptionType.VALUE, "Integer literals must be in the range -32768 to 65535"
-                                                             " (inclusive)", token)
+                raise CompilerException(ExceptionType.VALUE, token,
+                                        "Integer literals must be in the range -32768 to 65535 (inclusive)")
             self.index += 1
             return token
 
@@ -537,19 +519,18 @@ class Parser:
                 self.index += 1
                 return CodeObject(expression.value, token + expression + self.token(-1))
             if self.token().token_type is TokenType.INSTRUCTION_END:
-                raise CompilerException(ExceptionType.SYNTAX, 'Unmatched bracket', token)
+                raise CompilerException(ExceptionType.SYNTAX, token, 'Unmatched bracket')
             else:
-                raise CompilerException(ExceptionType.SYNTAX, 'Invalid Syntax. Expected closing bracket',
-                                        self.token())
+                raise CompilerException(ExceptionType.SYNTAX, self.token(), 'Invalid Syntax. Expected closing bracket')
 
         if token is None:
-            raise CompilerException(ExceptionType.SYNTAX,
-                                    "Missing value for '{}' instruction. Expected label, constant, or expression "
-                                    "involving constants", self.token(-1))
+            raise CompilerException(
+                ExceptionType.SYNTAX, self.token(-1),
+                "Missing value for '{}' instruction. Expected label, constant, or expression involving constants"
+            )
         else:
-            raise CompilerException(ExceptionType.SYNTAX,
-                                    "Unexpected token. Expected label, constant, or expression involving constants",
-                                    token)
+            raise CompilerException(ExceptionType.SYNTAX, token,
+                                    "Unexpected token. Expected label, constant, or expression involving constants")
 
 
 def parse(tokens: list[Token]) -> tuple[list[list[str | int]], list[str], dict[str, int]]:

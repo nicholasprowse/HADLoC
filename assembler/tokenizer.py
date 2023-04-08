@@ -75,7 +75,7 @@ class Tokenizer:
             if self.tokenize_int() is None and \
                     self.tokenize_keyword_identifier_register() is None and \
                     self.tokenize_symbol() is None:
-                raise CompilerException(ExceptionType.SYNTAX, 'Unexpected character', self.code[0])
+                raise CompilerException(ExceptionType.SYNTAX, self.code[0], 'Unexpected character')
             self.skip_whitespace_and_comments()
 
     def addtoken(self, token_type: TokenType, text: PositionedString, value: Optional[int | str] = None) -> Token:
@@ -118,7 +118,7 @@ class Tokenizer:
                 comment_start = self.code.substring(length=2, end=0, relative=True)
                 while self.code.advance_past('*/') is None:
                     if not self.code.skip_line():
-                        raise CompilerException(ExceptionType.SYNTAX, 'Comment not closed', comment_start)
+                        raise CompilerException(ExceptionType.SYNTAX, comment_start, 'Comment not closed')
 
             elif not self.code.advance_line():
                 return
@@ -206,7 +206,7 @@ class Tokenizer:
         elif self.code.match('1'):
             n = 1
         else:
-            raise CompilerException(ExceptionType.SYNTAX, "Invalid binary literal", self.code[0])
+            raise CompilerException(ExceptionType.SYNTAX, self.code[0], "Invalid binary literal")
 
         while True:
             if self.code.match('0'):
@@ -274,7 +274,7 @@ class Tokenizer:
             n = int(self.code[0])
             self.code.advance()
         except ValueError:
-            raise CompilerException(ExceptionType.SYNTAX, "Invalid hex literal", self.code[0])
+            raise CompilerException(ExceptionType.SYNTAX, self.code[0], "Invalid hex literal")
 
         while True:
             try:
@@ -303,21 +303,20 @@ class Tokenizer:
 
         if self.code[1] != "'":
             if self.code[0] == "'":
-                raise CompilerException(ExceptionType.SYNTAX,
-                                        "Invalid character literal. Cannot have empty character literals",
-                                        self.code.substring(start=-1, end=1, relative=True))
-            raise CompilerException(ExceptionType.SYNTAX,
-                                    "Invalid character literal. Character has no closing quotation mark",
-                                    self.code.substring(start=-1, end=1, relative=True))
+                raise CompilerException(ExceptionType.SYNTAX, self.code.substring(start=-1, end=1, relative=True),
+                                        "Invalid character literal. Cannot have empty character literals")
+            raise CompilerException(ExceptionType.SYNTAX, self.code.substring(start=-1, end=1, relative=True),
+                                    "Invalid character literal. Character has no closing quotation mark")
 
         c = self.code[0].text
         self.code.advance(2)
         if 32 <= ord(c) <= 126:
             return self.addtoken(TokenType.INTEGER, self.code.substring(start=start), ord(c))
         else:
-            raise CompilerException(ExceptionType.SYNTAX,
-                                    "Invalid character literal. Only characters with an ASCII value between 32 and 126 "
-                                    "(inclusive) are allowed", self.code[-2])
+            raise CompilerException(
+                ExceptionType.SYNTAX, self.code[-2],
+                "Invalid character literal. Only characters with an ASCII value from 32 to 126 are allowed"
+            )
 
 
 def tokenize(file: TextIOWrapper) -> list[Token]:

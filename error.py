@@ -59,7 +59,7 @@ class CompilerException(HADLOCException):
     """
     file_name = ''
 
-    def __init__(self, error_type: ExceptionType, msg: str, value: PositionedString):
+    def __init__(self, error_type: ExceptionType, value: PositionedString, msg: str):
         self.error_type = error_type
         self.msg = msg
         self.value = value

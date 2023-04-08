@@ -78,8 +78,8 @@ def encode_labels(instructions: list[list[str | int]], labels: dict[str, int]):
     _, finished = find_lengths(label_data, finished, instructions)
 
     if len(finished) < len(labels):
-        raise CompilerException(ExceptionType.NAME, 'Not able to resolve label locations',
-                                PositionedString.empty_string())
+        raise CompilerException(ExceptionType.NAME, PositionedString.empty_string(),
+                                'Not able to resolve label locations')
     else:
         for i in range(len(instructions)-1, -1, -1):
             instruction = instructions[i]
