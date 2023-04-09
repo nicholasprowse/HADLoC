@@ -175,7 +175,7 @@ class LinedCode(Code):
     def __init__(self, text: str):
         super().__init__(text)
         self.remaining_text: PositionedString = self.text
-        self.advance_line()
+        self.skip_line()
 
     def advance_line(self) -> bool:
         """

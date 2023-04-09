@@ -39,45 +39,21 @@ class PositionedString:
         self.coordinates = coordinates
 
     @classmethod
-    def create_string(cls, text: str = '', line: int = 0) -> Self:
+    def create_string(cls, text: str = '') -> Self:
         """
         Creates a PositionedString from a str. Automatically determines the line numbers and character positions based
         on new line characters. Line break characters are removed, as line breaks can be inferred from the coordinates
         Args:
             text: String representing some text. New line characters are used to determine line numbers of characters
-            line: The line number to start at. By default, this is 0
         """
         lines = text.splitlines(keepends=False)
-        text = ''
-        coordinates = []
-        for i in range(len(lines)):
-            for j in range(len(lines[i])):
-                text += lines[i][j]
-                coordinates.append(Coordinate(i + line, j))
-
-        return cls(text, coordinates)
+        coordinates = sum(([Coordinate(i, column) for column in range(len(line))] for i, line in enumerate(lines)),
+                          start=[])
+        return cls(''.join(lines), coordinates)
 
     @classmethod
     def empty_string(cls) -> Self:
         return PositionedString("", [])
-
-    def insert(self, index: int, string: str | Self) -> Self:
-        """
-        Inserts a string at the given index. The string is inserted such that its first character will be at the
-        location given by index. PositionedStrings, or builtin str types can be inserted.
-
-        If a builtin str type is inserted, then the coordinates of all inserted characters will be the same. If the
-        character directly before the insertion is (line, col), then the inserted characters will have coordinates
-        (line, col+1)
-
-        Args:
-            index: location within the String to insert the string.
-            string: The string to insert
-        """
-        assert -(len(self.text) + 1) <= index <= len(self.text)
-        if index < 0:
-            index += len(self.text) + 1
-        return self[:index] + string + self[index:]
 
     def isspace(self) -> bool:
         """Returns True if all characters in this string are whitespace"""
@@ -106,37 +82,28 @@ class PositionedString:
         Raises:
             ValueError: if the first character is not a hex character
         """
-        char = self.text[0]
-        if '0' <= char <= '9':
-            return ord(char) - ord('0')
-        if 'a' <= char <= 'f':
-            return ord(char) - ord('a') + 10
-        if 'A' <= char <= 'F':
-            return ord(char) - ord('A') + 10
-        raise ValueError("invalid literal for int() with base 16: '" + char + "'")
+        char = PositionedString.empty_string()
+        if len(self.text) > 0:
+            char = self.text[0]
+            if '0' <= char <= '9':
+                return ord(char) - ord('0')
+            if 'a' <= char <= 'f':
+                return ord(char) - ord('a') + 10
+            if 'A' <= char <= 'F':
+                return ord(char) - ord('A') + 10
+        raise ValueError(f"invalid literal for int() with base 16: '{char}'")
 
     def __eq__(self, other: Any) -> bool:
-        if isinstance(other, str):
-            return self.text == other
-        if isinstance(other, PositionedString):
-            return self.text == other.text
-        return False
-
-    def __ne__(self, other: Any) -> bool:
-        if type(other) == str:
-            return self.text != other
-        if type(other) == PositionedString:
-            return self.text != other.text
-        return True
+        return str(self) == str(other)
 
     def __lt__(self, other) -> bool:
         return str(self) < str(other)
 
-    def __gt__(self, other) -> bool:
-        return str(self) > str(other)
-
     def __le__(self, other) -> bool:
         return str(self) <= str(other)
+
+    def __gt__(self, other) -> bool:
+        return str(self) > str(other)
 
     def __ge__(self, other) -> bool:
         return str(self) >= str(other)
@@ -151,13 +118,6 @@ class PositionedString:
             return PositionedString(self.text[key], self.coordinates[key])
         return PositionedString(self.text[key], [self.coordinates[key]])
 
-    def __delitem__(self, key: slice | int):
-        """Deletes the character located at the specified index, or the slice specified by the range"""
-        list_str = list(self.text)
-        del list_str[key]
-        self.text = ''.join(list_str)
-        del self.coordinates[key]
-
     def line(self, index: int = 0) -> int:
         """
         Returns the line number of the character at the given index
@@ -171,6 +131,3 @@ class PositionedString:
 
     def __str__(self) -> str:
         return self.text
-
-    def __repr__(self) -> str:
-        return f"'{str(self)}'"
