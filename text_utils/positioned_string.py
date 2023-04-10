@@ -131,3 +131,6 @@ class PositionedString:
 
     def __str__(self) -> str:
         return self.text
+
+    def __repr__(self):     # pragma: no cover
+        return f'<{self.text}, {[(x.line, x.column) for x in self.coordinates]}>'

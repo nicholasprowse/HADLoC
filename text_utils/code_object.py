@@ -35,11 +35,15 @@ class CodeObject(Generic[T], PositionedString):
         assert isinstance(other, PositionedString)
         return CodeObject(self.value, super().__add__(other))
 
+    def __eq__(self, other):
+        """Equals is based purely on the objects value"""
+        return self.value == other
+
     def __hash__(self) -> int:
         """Hashes are done based on the value attribute"""
         return hash(self.value)
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         if self.value == self.text:
             return repr(self.value)
         return "(" + repr(self.value) + ", text=" + repr(self.text) + ')'
@@ -51,4 +55,16 @@ L = TypeVar('L')
 
 
 def add(a: CodeObject[J], b: CodeObject[K], func: Callable[[J, K], L]) -> CodeObject[L]:
+    """
+    Adds two CodeObjects using a given function to combine their values
+    This works similar to the standard + operator, except that it allows you to define how the values are combined
+    into the result
+    Args:
+        a: The first object to add
+        b: The second object to add
+        func: A binary function used to determine the value of the result
+
+    Returns: A CodeObject with the two text values added together and the values combined using func
+
+    """
     return CodeObject(func(a.value, b.value), a + b)

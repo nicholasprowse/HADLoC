@@ -80,7 +80,7 @@ def test_character_class_methods(text, space, numeric, alpha, alnum):
 def test_hash(a, b):
     a = PositionedString.create_string(a)
     b = PositionedString.create_string(b)
-    assert (a == b) == (hash(a) == hash(b))
+    assert (a != b) or (hash(a) == hash(b))     # a == b => hash(a) == hash(b)
 
 
 @pytest.mark.parametrize(
