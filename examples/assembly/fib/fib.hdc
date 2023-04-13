@@ -1,0 +1,230 @@
+/*
+Prints out the Fibonacci numbers. Each input signal computes and
+displays (in base 10) the next Fibonacci number, and it resets when it overflows
+The 8 bits
+*/
+// a is the current fibonacci number and b is the previous
+define a 0
+define b 1
+define int_to_string_arg 2
+define mod10 3
+define loop_counter 4
+define counter 5
+
+define decimal_string 50
+
+ldb 1
+mov L M
+
+ldb 0
+mov L H
+mov L M
+
+// Initialise display
+ldb 0x38
+opi L
+ldb 5
+mov L X
+ldb delay_loop1
+delay_loop1:
+    dec X X
+    jgt
+
+ldb 0x0E
+opi L
+ldb 5
+mov L X
+ldb delay_loop2
+delay_loop2:
+    dec X X
+    jgt
+
+ldb 0x06
+opi L
+ldb 5
+mov L X
+ldb delay_loop3
+delay_loop3:
+    dec X X
+    jgt
+
+// Clear display
+ldb 0x01
+opi L
+
+
+start:
+	ldb next_fib
+	jis
+	ldb start
+	jmp
+
+next_fib:
+	mov I X
+	ldb b
+	mov M X
+	ldb a
+	mov M L		// X = b and L = a
+
+	add X X L	// add the two fibonacci numbers
+	mov L Y
+
+	ldb reset
+	jcs		// Reset if addition overflowed
+
+return_fib:
+	ldb a
+	mov X M
+	ldb b
+	mov Y M		// move a and b back into memory
+    ldb int_to_string_arg
+    mov X M
+	ldb int_to_string
+	jmp
+
+reset:
+	ldb 1
+	mov L X
+
+	ldb 0
+	mov L Y
+
+	ldb return_fib
+	jmp
+
+int_to_string:
+	ldb 0x01
+   	opi L			// Reset display
+	mov L X
+	ldb delay_loop4
+delay_loop4:
+    nop
+    nop
+    nop
+	inc X X
+	jgt
+
+    // Store 0 into string (i.e. string starts with length 0)
+    ldb 0
+    mov L X
+    ldb decimal_string
+    mov X M
+
+    while_loop:
+        // mod10 = 0
+        ldb 0
+        mov L X
+        ldb mod10
+        mov X M
+        // Load 16 into loop_counter
+        ldb 8
+        mov L X
+        ldb loop_counter
+        mov X M
+        // Loop 16 times
+        for_loop:
+            // shift mod10
+            ldb mod10
+            mov M X
+            add X X M
+            mov X M
+
+            // shift the argument
+            ldb int_to_string_arg
+            mov M X
+            add X X M
+            mov X M
+
+            // If this carried, add to mod10
+            ldb add_mod10
+            jcs
+            ldb skip_add_mod10
+            jmp
+
+            add_mod10:
+            ldb mod10
+            inc X M
+            mov X M
+
+            skip_add_mod10:
+
+            // If mod10 >= 10, subtract 10 and add 1 to argument
+            // subtract 10 from mod10
+            ldb 10
+            mov L X
+            ldb mod10
+            sub X M X
+
+            // If the result is greater than or equal to zero, store the result in mod10 and add 1 to argument
+            ldb skip_if_statement
+            jlt
+
+                // Store result in mod10
+                ldb mod10
+                mov X M
+                // increment argument
+                ldb int_to_string_arg
+                inc X M
+                mov X M
+
+            skip_if_statement:
+
+            // decrement loop counter and jump back to start of loop if not equal to 0
+            ldb loop_counter
+            dec X M
+            mov X M
+            ldb for_loop
+            jne
+
+        // Add mod10 to the string
+        // Load mod10, add '0' and store in Y
+        ldb '0'
+        mov L X
+        ldb mod10
+        add X X M
+        mov X Y
+        // Get length of string, increment it, and add to address to get next location
+        ldb decimal_string
+        inc X M
+        mov X M
+        add L X L
+        // Put mod10 into this location
+        mov Y M
+
+        // jump to while loop if n is not equal to 0
+        ldb int_to_string_arg
+        mov M X
+        ldb while_loop
+        jne
+
+    // Print string where first element is the length of the string
+    // counter = string length
+    ldb decimal_string
+    mov M X
+    ldb counter
+    mov X M
+
+    // loop until counter = 0
+    while_loop1:
+        // load counter, add it to string and output data there
+        ldb counter
+        mov M X
+        ldb decimal_string
+        add L X L
+        opd M
+
+        // decrement counter and jump to start of loop if it is not 0
+        ldb counter
+        dec X M
+        mov X M
+        ldb while_loop1
+        nop
+        nop
+        nop
+        nop
+        nop
+        jne
+    // Load return address
+    ldb start
+    jmp
+// This is the last line

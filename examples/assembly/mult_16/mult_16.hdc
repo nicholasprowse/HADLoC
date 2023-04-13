@@ -1,0 +1,400 @@
+/*
+This program takes in two 8 bit numbers as input, multiplies them to get a 16 bit result, and displays the result in
+base 10
+*/
+define int_to_string_arg_L 0
+define int_to_string_arg_H 1
+define mod10 2
+define loop_counter 4
+define counter 5
+define print_return_L 6
+define print_return_H 7
+define shift_bit 8
+define AL 9
+define AH 10
+define B 11
+define ans_L 12
+define ans_H 13
+
+// Holds the string. First element is the length of the string
+define decimal_string 50
+
+ldb 0
+mov L H
+
+// Initialise display
+ldb 0x38
+opi L
+ldb 5
+mov L X
+ldb delay_loop1
+delay_loop1:
+    dec X X
+    jgt
+
+ldb 0x0E
+opi L
+ldb 5
+mov L X
+ldb delay_loop2
+delay_loop2:
+    dec X X
+    jgt
+
+ldb 0x06
+opi L
+ldb 5
+mov L X
+ldb delay_loop3
+delay_loop3:
+    dec X X
+    jgt
+
+// Clear display
+ldb 0x01
+opi L
+
+// load 0 into upper print arg
+ldb 0
+mov L X
+ldb int_to_string_arg_H
+mov X M
+// Load 0 into upper A
+ldb AH
+mov X M
+
+in_loop1:
+    lda in_end1
+    jis
+    lda in_loop1
+    jmp
+in_end1:
+    mov I X
+    lda AL
+    mov X M
+    ldb int_to_string_arg_L
+    mov X M
+    // load return address
+    ldu in_loop2
+    mov L X
+    ldb print_return_H
+    mov X M
+    ldb in_loop2
+    mov L X
+    ldb print_return_L
+    mov X M
+
+    lda int_to_string
+    jmp
+
+in_loop2:
+    lda in_end2
+    jis
+    lda in_loop2
+    jmp
+in_end2:
+    mov I X
+    lda B
+    mov X M
+    ldb int_to_string_arg_L
+    mov X M
+    // print x
+    ldb 'x'
+    opd L
+    // load return address
+    ldu multiply
+    mov L X
+    ldb print_return_H
+    mov X M
+    ldb multiply
+    mov L X
+    ldb print_return_L
+    mov X M
+    lda int_to_string
+    jmp
+
+/*
+Algorithm
+def multiply(a, b):
+    ans = 0
+    sb = 1
+    while sb & 0xFF:
+        if sb & b:
+            ans += a
+        a += a
+        sb += sb
+    return ans
+*/
+
+multiply:
+    ldb '='
+    opd L
+    // shift_bit = 1
+    ldb 1
+    mov L X
+    lda shift_bit
+    mov X M
+
+    // ans = 0
+    ldb 0
+    mov L X
+    ldb ans_L
+    mov X M
+    ldb ans_H
+    mov X M
+
+    while_loop_multiply:
+
+        // if shift_bit & B then ans += a
+        lda shift_bit
+        mov M X
+        ldb B
+        and X X M
+        lda skip_addition
+        jeq
+            // Inside if statement
+            // ans += a
+            lda AL
+            mov M X		// X = lower(A)
+            ldb ans_L
+            add X X M	// add lower bits
+            mov X M		// move the lower result back into ans
+            ldb AH
+            mov M X		// X = upper(A)
+            lda add_carry1
+            jcs
+            lda add_skip_carry1
+            jmp
+
+            add_carry1:
+            inc X X
+
+            add_skip_carry1:
+            lda ans_H
+            add X X M	// add upper bits
+            mov X M		// mov upper result back into ans
+
+        skip_addition:
+        // a += a
+        lda AL
+        mov M X		// X = lower(A)
+        add X X M	// add lower bits
+        mov X M		// move the lower result back into A
+        ldb AH
+        mov M X		// X = upper(A)
+        lda add_carry2
+        jcs
+        lda add_skip_carry2
+        jmp
+
+        add_carry2:
+        inc X X
+
+        add_skip_carry2:
+        lda AH
+        add X X M	// add upper bits
+        mov X M		// mov upper result back into A
+
+        // shift_bit <<= 1
+        ldb shift_bit
+        mov M X
+        add X X M
+        mov X M
+
+        // continue loop if shift_bit != 0
+        lda while_loop_multiply
+        jne
+
+    // print out result
+    // Load argument
+    lda ans_H
+    mov M X
+    ldb int_to_string_arg_H
+    mov X M
+    ldb ans_L
+    mov M X
+    ldb int_to_string_arg_L
+    mov X M
+
+    // Load return address
+    ldu end
+    mov L X
+    ldb print_return_H
+    mov X M
+    ldb end
+    mov L X
+    ldb print_return_L
+    mov X M
+
+    // jmp to subroutine
+    lda int_to_string
+    jmp
+
+end:
+    hlt
+/*
+Algorithm
+def int_to_str(n):
+    result = ""
+    while (n & 0xFFFF) != 0:
+        mod10 = 0
+        for _ in range(16):
+            mod10 <<= 1
+            mod10 += 1 if(n & 0x8000) else 0
+            n <<= 1
+            if mod10 >= 10:
+                mod10 -= 10
+                n += 1
+        result += str(mod10)
+    return result
+*/
+// 16 bit integer to string
+int_to_string:
+    // Store 0 into string (i.e. string starts with length 0)
+    ldb 0
+    mov L X
+    lda decimal_string
+    mov X M
+
+    while_loop:
+        // mod10 = 0
+        ldb 0
+        mov L X
+        lda mod10
+        mov X M
+        // Load 16 into loop_counter
+        ldb 16
+        mov L X
+        ldb loop_counter
+        mov X M
+        // Loop 16 times
+        for_loop:
+            // shift mod10
+            lda mod10
+            mov M X
+            add X X M
+            mov X M
+
+            // shift upper part of argument
+            ldb int_to_string_arg_H
+            mov M X
+            add X X M
+            mov X M
+
+            // If this carried, add to mod10
+            lda add_mod10
+            jcs
+            lda skip_add_mod10
+            jmp
+
+            add_mod10:
+            lda mod10
+            inc X M
+            mov X M
+
+            skip_add_mod10:
+            // shift lower part of argument
+            lda int_to_string_arg_L
+            mov M X
+            add X X M
+            mov X M
+
+            // If this carried add to upper part of argument
+            lda add_upper_arg
+            jcs
+            lda skip_add_upper_arg
+            jmp
+
+            add_upper_arg:
+            lda int_to_string_arg_H
+            inc X M
+            mov X M
+
+            skip_add_upper_arg:
+
+            // If mod10 >= 10, subtract 10 and add 1 to argument
+            // subtract 10 from mod10
+            ldb 10
+            mov L X
+            lda mod10
+            sub X M X
+
+            // If the result is greater than or equal to zero, store the result in mod10 and add 1 to argument
+            lda skip_if_statement
+            jlt
+
+                // Store result in mod10
+                lda mod10
+                mov X M
+                // increment argument
+                ldb int_to_string_arg_L
+                inc X M
+                mov X M
+                // skip incrementing upper part if increment didn't carry
+                lda skip_if_statement
+                jcs
+                lda int_to_string_arg_H
+                inc X M
+                mov X M
+
+            skip_if_statement:
+
+            // decrement loop counter and jump back to start of loop if not equal to 0
+            lda loop_counter
+            dec X M
+            mov X M
+            lda for_loop
+            jne
+
+        // Add mod10 to the string
+        // Load mod10, add '0' and store in Y
+        ldb '0'
+        mov L X
+        lda mod10
+        add X X M
+        mov X Y
+        // Get length of string, increment it, and add to address to get next location
+        ldb decimal_string
+        inc X M
+        mov X M
+        add L X L
+        // Put mod10 into this location
+        mov Y M
+
+        // jump to while loop if n is not equal to 0
+        ldb int_to_string_arg_H
+        mov M X
+        ldb int_to_string_arg_L
+        or X X M
+        lda while_loop
+        jne
+
+    // Print string where first element is the length of the string
+    // counter = string length
+    lda decimal_string
+    mov M X
+    ldb counter
+    mov X M
+
+    // loop until counter = 0
+    while_loop1:
+        // load counter, add it to string and output data there
+        lda counter
+        mov M X
+        ldb decimal_string
+        add L X L
+        opd M
+
+        // decrement counter and jump to start of loop if it is not 0
+        ldb counter
+        dec X M
+        mov X M
+        lda while_loop1
+        jne
+    // Load return address
+    lda print_return_H
+    mov M X
+    ldb print_return_L
+    mov M L
+    mov X H
+    jmp
