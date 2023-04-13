@@ -35,10 +35,10 @@ class Tokenizer:
     """
     Used for tokenizing an assembly file. Takes the raw text from the assembly file as a string, and generates a 2
     dimensional list of tokens, stored in the variable tokens. The tokens list is structured so that each line in the
-    code is in a separate row of the 2 dimensional list. Each row contains a series of tokens, stored as tuples. The
-    first element of the tokens is the type of the token, stored as a string, and the second element is the value.
+    code is in a separate row of the 2 dimensional list. Each row contains a series of tokens. Each token contains a
+    token type and a value
 
-    There are 5 types of token: 'keyword', 'identifier', 'register', 'label', 'integer'
+    There are 6 types of token: 'keyword', 'identifier', 'register', 'symbol', 'integer', 'instruction end'
 
     More information about what constitutes each type of token can be found in the documentation for the functions
     that tokenize them (e.g. Tokenizer.tokenize_label()).
@@ -142,7 +142,7 @@ class Tokenizer:
         Returns: The token generated, or None if no token was created
         """
         word = self.code[0]
-        if not (word.isalpha() or word == '_'):
+        if not word.isalpha() and not word == '_':
             return None
 
         for i in range(1, len(self.code)):
