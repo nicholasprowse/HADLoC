@@ -122,7 +122,7 @@ class Code:
         Returns:
             If the current character is in the given range, then the character is returned, otherwise None is returned
         """
-        if lower <= self[0] <= upper:
+        if self.offset < len(self.text) and lower <= self[0] <= upper:
             self.offset += 1
             return self.text[self.offset - 1]
         return None
@@ -143,15 +143,10 @@ class Code:
             last_char = self.text[-1]
             return PositionedString('\0', last_char.coordinates)
 
-    def skip_whitespace(self):
-        """Moves the offset past any whitespace at the current position"""
-        while self[0].isspace():
-            self.advance()
-
     def __str__(self) -> str:
-        return str(self.text[self.offset:len(self.text)])
+        return str(self.text[self.offset:])
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:      # pragma: no cover
         return str(self)
 
 
