@@ -7,18 +7,22 @@ import error
 
 from error import CompilerException, ExceptionType
 from text_utils import CodeObject, LinedCode, PositionedString
+from text_utils.positioned_string import Coordinate
 
 keywords = ['add', 'sub', 'neg', 'and', 'or', 'not', 'eq', 'ne', 'gt', 'ge', 'lt', 'le', 'cry', 'in', 'push', 'pop',
             'label', 'if', 'goto', 'function', 'call', 'return']
 segments = ['argument', 'local', 'static', 'constant', 'this', 'that', 'pointer', 'temp']
 
+symbols = ['[', ']']
 
 class TokenType(Enum):
-    KEYWORD = auto()
-    SEGMENT = auto()
-    IDENTIFIER = auto()
-    INTEGER = auto()
-    INSTRUCTION_END = auto()
+    KEYWORD = 'keyword'
+    SEGMENT = 'memory segment'
+    IDENTIFIER = 'identifier'
+    INTEGER = 'integer'
+    SYMBOL = 'symbol'
+    INSTRUCTION_END = 'line break'
+    PROGRAM_END = 'program end'
 
 
 class Token(CodeObject):
@@ -72,9 +76,13 @@ class Tokenizer:
         self.skip_whitespace_and_comments()
         while self.code.has_more():
             if self.tokenize_int() is None and \
-                    self.tokenize_keyword_identifier() is None:
+                    self.tokenize_keyword_identifier() is None \
+                    and self.tokenize_symbol() is None:
                 raise CompilerException(ExceptionType.SYNTAX, self.code[0], 'Unexpected character')
             self.skip_whitespace_and_comments()
+
+        self.end_instruction()
+        self.tokens.append(Token(TokenType.PROGRAM_END))
         return self.tokens
 
     def addtoken(self, token_type: TokenType, text: PositionedString, value: Optional[int | str] = None) -> Token:
@@ -95,10 +103,15 @@ class Tokenizer:
 
         # Add INSTRUCTION_END if the new token is on a different line to the previous one
         if len(self.tokens) > 0 and self.tokens[-1].line() != text.line():
-            self.tokens.append(Token(TokenType.INSTRUCTION_END))
+            self.end_instruction()
 
         self.tokens.append(Token(token_type, CodeObject(value, text)))
         return self.tokens[-1]
+
+    def end_instruction(self):
+        last_coord = self.tokens[-1].coordinates[-1]
+        string = PositionedString(' ', [Coordinate(last_coord.line, last_coord.column + 1)])
+        self.tokens.append(Token(TokenType.INSTRUCTION_END, CodeObject(None, string)))
 
     def skip_whitespace_and_comments(self):
         """
@@ -154,6 +167,17 @@ class Tokenizer:
             return self.addtoken(TokenType.SEGMENT, word)
 
         return self.addtoken(TokenType.IDENTIFIER, word)
+
+    def tokenize_symbol(self) -> Token | None:
+        """
+        Tokenizes a symbol. Allowed symbols are: '[', ']'
+
+        Returns: The token generated, or None if no token was created
+        """
+        symbol = self.code.match(*symbols)
+        if symbol is None:
+            return None
+        return self.addtoken(TokenType.SYMBOL, symbol)
 
     def tokenize_int(self) -> Token | None:
         """

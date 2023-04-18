@@ -1,15 +1,15 @@
 from io import TextIOWrapper
 
-from tokenizer import Tokenizer
-from utils import verify_file
+from .parser import Parser
+from .tokenizer import Tokenizer
 
 
 def translate(file: TextIOWrapper):
-    file_name = verify_file(file, 'vm', "File must have '.vm' extension")
     tokens = Tokenizer(file).run()
-    print(tokens)
+    parser = Parser(tokens)
+    print(parser.ast)
     # instructions, labels = parse(tokens)
     # encode_labels(instructions, labels)
     # files = write_code(instructions, file_name[:-len(extension) - 1])
-    print('Successfully Translated')
+    return [], []
 

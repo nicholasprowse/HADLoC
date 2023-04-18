@@ -14,6 +14,10 @@ def extension(file_name: str) -> str:
     return file_name[file_name.rfind('.')+1:].lower()
 
 
+def path_without_extension(file: TextIOWrapper) -> str:
+    return file.name[:file.name.rfind('.')].lower()
+
+
 def get_file_name(file: TextIOWrapper | str) -> str:
     """
     Returns the name of a given file. This is just the name, not including the path. The file argument can either be a

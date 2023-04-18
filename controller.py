@@ -10,8 +10,9 @@ import serial
 
 import writer
 from assembler import assemble
-from error import HADLOCException, ExceptionType
-from utils import get_file_name
+from error import HADLOCException, ExceptionType, FileError
+from translator import translate
+from utils import get_file_name, extension
 import emulator.display
 
 
@@ -128,9 +129,16 @@ def execute_read(args, program_name):
         args.file.close()
 
 
-def execute_assemble(args, program_name):
-    warnings, files = assemble(args.file)
-    print(f"Successfully Assembled '{get_file_name(args.file)}' with "
+def execute_compile(args, program_name):
+    file_ext = extension(args.file.name)
+    if file_ext == 'hdc':
+        warnings, files = assemble(args.file)
+    elif file_ext == 'vm':
+        warnings, files = translate(args.file)
+    else:
+        raise FileError(args.file.name, "File must have '.hdc' or '.vm' extension")
+
+    print(f"Successfully Compiled '{get_file_name(args.file)}' with "
           f"{len(warnings)} warning{'' if len(warnings) == 1 else 's'}", flush=True)
     for warning in warnings:
         print(f"Warning: {warning}")
@@ -237,31 +245,31 @@ def main():
     subparsers = parser.add_subparsers(help="For more information on using each command, type\n'{} command_name -h'"
                                        .format(parser.prog), dest='command', title='Commands')
 
-    assemble_parser = subparsers.add_parser('assemble',
-                                            help='Assembles the provided assembly file and writes the assembled machine'
-                                                 ' code into a binary file of the same name')
-    assemble_parser.description = \
-        'Assembles the given assembly file into machine code. Produces 3 files as output, raw binary file containing ' \
-        'the machine code, and two text files containing the binary and hex representations of the machine code, so ' \
-        'the user can read the generated machine code'
-    assemble_parser.add_argument('-c', '--clean', action='store_true', default=False,
+    compile_parser = subparsers.add_parser('compile',
+                                            help='Compiles the provided source code file and writes the generated '
+                                                 'machine  code into a binary file of the same name')
+    compile_parser.description = \
+        "Compiles the given source code file into machine code. The code can be VM code, or assembly, and the " \
+        "relevant compiler will be chosen based on the file extension. Assembly files must have extension '.hdc', " \
+        "while VM files must have extension '.vm'."
+    compile_parser.add_argument('-c', '--clean', action='store_true', default=False,
                                  help='Cleans up (deletes) all intermediate files. The only file left will be the raw '
                                       'binary machine code file.')
-    assemble_parser.add_argument('-l', '--load', action='store_true', default=False,
+    compile_parser.add_argument('-l', '--load', action='store_true', default=False,
                                  help='Loads the generated machine code onto a connected EEPROM')
-    port_group = assemble_parser.add_mutually_exclusive_group()
+    port_group = compile_parser.add_mutually_exclusive_group()
     port_group.add_argument('-a', '--auto-port', action='store_true', default=False,
                             help="Automatically selects the serial port the EEPROM is connected to. "
-                                 "Can only be used if '-l' is used. Note: this may not work on all operating "
+                                 "Can only be used if '--load' is used. Note: this may not work on all operating "
                                  "systems")
     port_group.add_argument('--port',
-                            help="Name of serial port to load the assembled machine code onto. For a list of available "
-                                 "serial ports, type '{} serialports'".format(parser.prog))
+                            help=f"Name of serial port to load the generated machine code onto. For a list of "
+                                 f"available serial ports, type '{parser.prog} serialports'")
 
-    assemble_parser.add_argument('file', type=argparse.FileType('r'),
-                                 help="The file containing the assembly code to be assembled. "
-                                      "Must have the '.asm' file extension")
-    assemble_parser.set_defaults(func=lambda x: execute_assemble(x, program_name))
+    compile_parser.add_argument('file', type=argparse.FileType('r'),
+                                 help="The file containing the source code to be assembled. "
+                                      "Must have '.hdc' or '.vm' file extension")
+    compile_parser.set_defaults(func=lambda x: execute_compile(x, program_name))
 
     read_parser = subparsers.add_parser('read', help='Reads data from a connected EEPROM')
     read_parser.description = 'Reads data from a connected EEPROM and displays the data to the console. ' \

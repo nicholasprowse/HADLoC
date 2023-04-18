@@ -1202,7 +1202,7 @@ class ASTNode:
     - A list of ASTNode objects or tokens. The list must consist of one or the other (not both). This is used when it is
       not known how many children of a certain type a node will have. For example, a parameter list will have an
       arbitrary number of ASTNode children, one for each parameter
-    For example, a class declaraction node may have the following children:
+    For example, a class declaration node may have the following children:
         'PrivacyModifier', 'Name', 'FieldDeclarations', 'FunctionDeclarations'
     where 'PrivacyModifier' and 'Name' both consist of a token, and 'FieldDeclarations',
     'FunctionDeclarations' would both be lists of ASTNodes, since we cannot know how many variables/functions a class
