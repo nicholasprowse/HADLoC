@@ -3,11 +3,12 @@ from typing import Self, TypeVar, Generic
 
 T = TypeVar('T')
 
+
 class ASTNode(Generic[T]):
-    def __init__(self, node_type: str, node_value: T | None = None):
+    def __init__(self, node_type: str, value: T | None = None):
         self.children = []
         self.node_type = node_type
-        self.node_value = node_value
+        self.value = value
 
     def add_child(self, child: Self):
         if child.node_type is not None:
@@ -20,8 +21,8 @@ class ASTNode(Generic[T]):
         d = {'type': self.node_type}
         if len(self.children) > 0:
             d['children'] = [x.to_dict() for x in self.children]
-        if self.node_value is not None:
-            d['value'] = str(self.node_value)
+        if self.value is not None:
+            d['value'] = str(self.value)
         return d
 
     def __str__(self):

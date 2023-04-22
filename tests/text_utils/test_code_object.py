@@ -47,7 +47,7 @@ def test_add_operator(a, b, expected_string):
     ]
 )
 def test_add_function(a, b, expected_string):
-    def func(x, y): return sentinel.value
+    def func(_, __): return sentinel.value
     result = add(CodeObject(sentinel.value_a, a), CodeObject(sentinel.value_b, b), func)
     assert result.value == sentinel.value
     assert result.text == expected_string.text

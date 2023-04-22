@@ -42,7 +42,6 @@ def test_has_more(offset, has_more):
     assert code.has_more() == has_more
 
 
-
 @pytest.mark.parametrize(
     'offset,amount,result,result_offset',
     [
@@ -133,7 +132,6 @@ def test_len(offset, expected_len):
     code = Code(lorem_ipsum)
     code.offset = offset
     assert len(code) == expected_len
-
 
 
 @pytest.mark.parametrize(

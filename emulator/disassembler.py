@@ -61,7 +61,7 @@ def disassemble(instruction: Word) -> str:
             if not instruction[1] and instruction[2]:
                 return 'jis'
             if instruction[1] and instruction[2]:
-                return 'jcis'
+                return ''
             return 'nop'
 
     # Out instruction

@@ -4,58 +4,58 @@ This script uses a prime sieve to generate a list of primes. It then displays ea
 function main
     call initialize_display
     call prime_sieve
-
+    return
 
 function prime_sieve
     // Generates a prime sieve of length 1000, at memory location 3000
-//    push 3000
-//    pop pointer[0]
-//
-//    push 0
-//    pop temp[0]
-//    label initialisation_loop
-//        add pointer[0] temp[0]
-//        pop pointer[1]
-//        push 0
-//        pop that[0]
-//        inc temp[0]
-//        pop temp[0]
-//        push temp[0]
-//        push 1000
-//        if lt goto initialisation_loop
-//
-//    push 0
-//    pop temp[0]
-//    label outer_loop
-//        add pointer[0] temp[0]
-//        pop pointer[1]
-//
-//        add temp[0] temp[0]
-//        pop temp[1]
-//        if that[0] goto inner_loop
-//        goto end_outer_loop
-//
-//        label inner_loop
-//            add pointer[0] temp[1]
-//            pop pointer[1]
-//            push 1
-//            pop that[0]
-//
-//            add temp[1] temp[0]
-//            pop temp[1]
-//            push temp[1]
-//            push 1000
-//            if lt goto inner_loop
-//
-//        label end_outer_loop
-//        inc temp[0]
-//        pop temp[0]
-//        push temp[0]
-//        push 100
-//        if lt goto initialisation_loop
-//
-//    push pointer[0]
-//    return
+    push 3000
+    pop pointer[0]
+
+    push 0
+    pop temp[0]
+    label initialisation_loop
+        add pointer[0] temp[0]
+        pop pointer[1]
+        push 0
+        pop that[0]
+        inc temp[0]
+        pop temp[0]
+        push temp[0]
+        push 1000
+        if lt goto initialisation_loop
+
+    push 0
+    pop temp[0]
+    label outer_loop
+        add pointer[0] temp[0]
+        pop pointer[1]
+
+        add temp[0] temp[0]
+        pop temp[1]
+        if that[0] goto inner_loop
+        goto end_outer_loop
+
+        label inner_loop
+            add pointer[0] temp[1]
+            pop pointer[1]
+            push 1
+            pop that[0]
+
+            add temp[1] temp[0]
+            pop temp[1]
+            push temp[1]
+            push 1000
+            if lt goto inner_loop
+
+        label end_outer_loop
+        inc temp[0]
+        pop temp[0]
+        push temp[0]
+        push 100
+        if lt goto initialisation_loop
+
+    push pointer[0]
+    return
 
 
 

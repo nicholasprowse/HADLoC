@@ -1,0 +1,18 @@
+{
+  "function name": "Expected an identifier after the 'function' keyword, representing the name of the function",
+  "function locals": "Expected an optional integer after a function definition, representing the number of local variables in the function",
+  "call name": "Expected an identifier after the 'call' keyword, representing the name of the function to call",
+  "call arguments": "Expected an optional integer after a function call, representing the number of arguments to pass to the function",
+  "push argument": "Expected integer constant or memory segment as the argument to a 'push' command",
+  "pop argument": "Expected optional memory segment after 'pop' keyword, to store the popped value into",
+  "label argument": "Expected identifier after 'label' keyword, representing the name of the label",
+  "segment opening bracket": "Expected opening bracket, '[', after '{0}' memory segment to specify the index of the {0} segment",
+  "segment index": "Expected integer between brackets of '{0}' memory segment to specify the index of the '{0}' segment",
+  "segment closing bracket": "Expected closing bracket, ']', after index of the '{0}' memory segment",
+  "binary operator argument": "Expected 0 to 2 arguments for the '{0}' command. Arguments can be integer constants or memory segments",
+  "unary operator argument": "Expected an optional argument for the '{0}' command. The argument can be an integer constant or memory segment",
+  "goto argument": "Expected identifier after 'goto' keyword, representing the label to go to",
+  "if argument": "Expected optional condition in 'if' statement. The condition can be a memory segment, or one of 'eq', 'ne', 'lt', 'le', 'gt' or 'ge'",
+  "if goto": "Expected 'goto' keyword after if condition",
+  "return argument": "Expected return value after the 'return' keyword. The return value can be an integer constant or memory segment"
+}

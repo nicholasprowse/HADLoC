@@ -1,5 +1,9 @@
+import os
+import pathlib
+
 from error import FileError
 from _io import TextIOWrapper
+from contextlib import contextmanager
 
 
 def extension(file_name: str) -> str:
@@ -54,3 +58,10 @@ def verify_file(file: TextIOWrapper, ext: str, ext_error: str) -> str:
     if ext != file_ext:
         raise FileError(file_name, ext_error)
     return file_name[:-len(file_ext)-1]
+
+
+@contextmanager
+def local_open(file, *args, **kwargs):
+    hadloc_directory = pathlib.Path(os.path.realpath(__file__)).parent.resolve()
+    with open(os.path.join(hadloc_directory, file), *args, **kwargs) as f:
+        yield f

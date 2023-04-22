@@ -1,5 +1,5 @@
 import os
-from enum import Enum, auto
+from enum import Enum
 from io import TextIOWrapper
 from typing import Optional
 
@@ -10,10 +10,11 @@ from text_utils import CodeObject, LinedCode, PositionedString
 from text_utils.positioned_string import Coordinate
 
 keywords = ['add', 'sub', 'neg', 'and', 'or', 'not', 'eq', 'ne', 'gt', 'ge', 'lt', 'le', 'cry', 'in', 'push', 'pop',
-            'label', 'if', 'goto', 'function', 'call', 'return']
+            'label', 'if', 'goto', 'function', 'call', 'return', 'inc', 'dec']
 segments = ['argument', 'local', 'static', 'constant', 'this', 'that', 'pointer', 'temp']
 
 symbols = ['[', ']']
+
 
 class TokenType(Enum):
     KEYWORD = 'keyword'

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import sys
 import os
 
@@ -246,17 +247,17 @@ def main():
                                        .format(parser.prog), dest='command', title='Commands')
 
     compile_parser = subparsers.add_parser('compile',
-                                            help='Compiles the provided source code file and writes the generated '
-                                                 'machine  code into a binary file of the same name')
+                                           help='Compiles the provided source code file and writes the generated '
+                                                'machine  code into a binary file of the same name')
     compile_parser.description = \
         "Compiles the given source code file into machine code. The code can be VM code, or assembly, and the " \
         "relevant compiler will be chosen based on the file extension. Assembly files must have extension '.hdc', " \
         "while VM files must have extension '.vm'."
     compile_parser.add_argument('-c', '--clean', action='store_true', default=False,
-                                 help='Cleans up (deletes) all intermediate files. The only file left will be the raw '
-                                      'binary machine code file.')
+                                help='Cleans up (deletes) all intermediate files. The only file left will be the raw '
+                                     'binary machine code file.')
     compile_parser.add_argument('-l', '--load', action='store_true', default=False,
-                                 help='Loads the generated machine code onto a connected EEPROM')
+                                help='Loads the generated machine code onto a connected EEPROM')
     port_group = compile_parser.add_mutually_exclusive_group()
     port_group.add_argument('-a', '--auto-port', action='store_true', default=False,
                             help="Automatically selects the serial port the EEPROM is connected to. "
@@ -267,8 +268,8 @@ def main():
                                  f"available serial ports, type '{parser.prog} serialports'")
 
     compile_parser.add_argument('file', type=argparse.FileType('r'),
-                                 help="The file containing the source code to be assembled. "
-                                      "Must have '.hdc' or '.vm' file extension")
+                                help="The file containing the source code to be assembled. "
+                                     "Must have '.hdc' or '.vm' file extension")
     compile_parser.set_defaults(func=lambda x: execute_compile(x, program_name))
 
     read_parser = subparsers.add_parser('read', help='Reads data from a connected EEPROM')

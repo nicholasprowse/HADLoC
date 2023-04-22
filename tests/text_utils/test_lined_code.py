@@ -50,7 +50,6 @@ def test_has_more(offset, lines_skipped, has_more):
     assert code.has_more() == has_more
 
 
-
 @pytest.mark.parametrize(
     'offset,amount,result,result_offset',
     [
@@ -143,7 +142,6 @@ def test_len(offset, expected_len):
     assert len(code) == expected_len
 
 
-
 @pytest.mark.parametrize(
     'offset,index,expected_char,expected_coordinates',
     [
@@ -186,23 +184,23 @@ def test_skip_line(offset1, offset2, offset3):
     code.offset = offset1
     assert code.text == lines[0]
     assert code.remaining_text == lines[1] + lines[2]
-    assert code.has_more() == True
-    assert code.skip_line() == True
+    assert code.has_more() is True
+    assert code.skip_line() is True
 
     code.offset = offset2
     assert code.text == lines[1]
     assert code.remaining_text == lines[2]
-    assert code.has_more() == True
-    assert code.skip_line() == True
+    assert code.has_more() is True
+    assert code.skip_line() is True
 
     code.offset = offset3
     assert code.text == lines[2]
     assert code.remaining_text == ''
-    assert code.has_more() == True
-    assert code.skip_line() == False
+    assert code.has_more() is True
+    assert code.skip_line() is False
 
     assert code.remaining_text == ''
-    assert code.has_more() == False
+    assert code.has_more() is False
 
 
 @pytest.mark.parametrize(
