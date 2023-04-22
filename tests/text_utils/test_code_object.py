@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import sentinel
 
-from text_utils import PositionedString, CodeObject, add
-from text_utils.positioned_string import Coordinate
+from app.text_utils import PositionedString, CodeObject, add
+from app.text_utils.positioned_string import Coordinate
 
 
 def constructor(name):

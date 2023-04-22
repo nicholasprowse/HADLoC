@@ -1,7 +1,7 @@
 from io import TextIOWrapper
 
 from .parser import vm_program
-from grammar import parse
+from app.grammar import parse
 from .tokenizer import Tokenizer
 
 

@@ -3,11 +3,11 @@ from enum import Enum
 from io import TextIOWrapper
 from typing import Optional
 
-import error
+from app import error
 
-from error import CompilerException, ExceptionType
-from text_utils import CodeObject, LinedCode, PositionedString
-from text_utils.positioned_string import Coordinate
+from app.error import CompilerException, ExceptionType
+from app.text_utils import CodeObject, LinedCode, PositionedString
+from app.text_utils.positioned_string import Coordinate
 
 keywords = ['add', 'sub', 'neg', 'and', 'or', 'not', 'eq', 'ne', 'gt', 'ge', 'lt', 'le', 'cry', 'in', 'push', 'pop',
             'label', 'if', 'goto', 'function', 'call', 'return', 'inc', 'dec']

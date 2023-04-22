@@ -1,4 +1,4 @@
-import writer
+from app import writer
 
 
 def write_code(instructions: list[list[str | int]], file_name: str):

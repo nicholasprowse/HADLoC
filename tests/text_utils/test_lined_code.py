@@ -1,7 +1,7 @@
-from text_utils import LinedCode
+from app.text_utils import LinedCode
 import pytest
 
-from text_utils.positioned_string import Coordinate
+from app.text_utils.positioned_string import Coordinate
 
 lorem_ipsum = 'Lorem ipsum dolor sit amet,\n consectetur adipiscing elit.\n Donec mollis.'
 lines = lorem_ipsum.split('\n')

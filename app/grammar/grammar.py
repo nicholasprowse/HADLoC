@@ -1,7 +1,7 @@
 from typing import Callable, Any, TypeVar
 
-from grammar.abstract_syntax_tree import ASTNode
-from grammar.token_list import TokenList
+from app.grammar.abstract_syntax_tree import ASTNode
+from app.grammar.token_list import TokenList
 
 from abc import ABC, abstractmethod
 

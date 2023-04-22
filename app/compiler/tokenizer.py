@@ -1,9 +1,9 @@
 import os
-import error
+from app import error
 from enum import Enum
 
-from error import CompilerException
-from text_utils import PositionedString, CodeObject, Code
+from app.error import CompilerException
+from app.text_utils import PositionedString, CodeObject, Code
 
 keywords = ['public', 'private', 'class', 'static', 'byte', 'char', 'bool', 'constructor', 'true', 'false', 'null',
             'import', 'void', 'new']

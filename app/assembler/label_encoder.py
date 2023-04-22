@@ -1,8 +1,8 @@
-from assembler.parser import write_load
-from error import CompilerException, ExceptionType
+from app.assembler.parser import write_load
+from app.error import CompilerException, ExceptionType
 from copy import deepcopy
 
-from text_utils import PositionedString
+from app.text_utils import PositionedString
 
 # TODO As yet this cannot handle situations that are unsolvable without nop
 # For example: if there is a label at instruction 255 with a single ldb instruction before it

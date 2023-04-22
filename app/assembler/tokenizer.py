@@ -3,10 +3,10 @@ from enum import Enum, auto
 from io import TextIOWrapper
 from typing import Optional
 
-import error
+from app import error
 
-from error import CompilerException, ExceptionType
-from text_utils import CodeObject, LinedCode, PositionedString
+from app.error import CompilerException, ExceptionType
+from app.text_utils import CodeObject, LinedCode, PositionedString
 
 keywords = ['lda', 'ldb', 'ldu', 'mov', 'jmp', 'jlt', 'jeq', 'jgt', 'jle', 'jge', 'jne', 'nop', 'jis', 'jcs', 'opd',
             'opi', 'hlt', 'not', 'neg', 'inc', 'dec', 'sub', 'and', 'or', 'add', 'ics', 'icc', 'define']

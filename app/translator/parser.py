@@ -1,10 +1,10 @@
 import json
 from typing import Callable
 
-from grammar import Terminal, Sequential, Optional, AnyOf, ZeroOrMore, Repeated
-from grammar.abstract_syntax_tree import ASTNode
-from translator.tokenizer import TokenType
-from utils import local_open
+from app.grammar import Terminal, Sequential, Optional, AnyOf, ZeroOrMore, Repeated
+from app.grammar.abstract_syntax_tree import ASTNode
+from app.translator.tokenizer import TokenType
+from app.utils import local_open
 
 with local_open('./translator/parser_errors.json') as f:
     ERRORS = json.load(f)

@@ -9,12 +9,12 @@ from serial.tools import list_ports
 from serial import SerialException
 import serial
 
-import writer
-from assembler import assemble
-from error import HADLOCException, ExceptionType, FileError
-from translator import translate
-from utils import get_file_name, extension
-import emulator.display
+from app import writer
+from app.assembler import assemble
+from app.error import HADLOCException, ExceptionType, FileError
+from app.translator import translate
+from app.utils import get_file_name, extension
+import app.emulator.display
 
 
 # TODO Serial read can raise a SerialError if the connection is lost mid read. Should catch these errors
@@ -360,7 +360,7 @@ def main():
                                       'one by one, and register/memory contents are shown')
     emulator_parser.add_argument('file', type=argparse.FileType('rb'),
                                  help='Binary file to execute. Must contain HADLoC machine code')
-    emulator_parser.set_defaults(func=emulator.display.start)
+    emulator_parser.set_defaults(func=app.emulator.display.start)
 
     args = parser.parse_args()
 

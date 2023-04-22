@@ -1,8 +1,8 @@
 import sys
 from enum import Enum
 
-import utils
-from text_utils import PositionedString
+from . import utils
+from .text_utils import PositionedString
 
 code = ['']
 

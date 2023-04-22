@@ -1,8 +1,8 @@
 import math
 import time
 
-import utils
-from error import FileError
+from . import utils
+from .error import FileError
 
 BOX_CHAR = {'HORIZONTAL': '\u2501', 'VERTICAL': '\u2503', 'CROSS': '\u254B', 'UPPER T': '\u2533'}
 

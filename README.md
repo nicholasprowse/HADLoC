@@ -1,4 +1,4 @@
-# HADLoC
+# HaDLOC
 Command line tool containing several utilities for HADLoC.
 
 HADLoC (Harvard Architecture Discrete Logic Computer) is an 8-bit computer I constructed, primarily out of 7400 series TTL integrated circuits. 

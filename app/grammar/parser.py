@@ -1,4 +1,4 @@
-from error import CompilerException, ExceptionType
+from app.error import CompilerException, ExceptionType
 from .grammar import GrammarSymbol
 from .token_list import TokenList
 

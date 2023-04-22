@@ -1,6 +1,6 @@
 from .tokenizer import tokenize
 from .parser import Parser
-from utils import verify_file
+from app.utils import verify_file
 
 
 def jcompile(file):

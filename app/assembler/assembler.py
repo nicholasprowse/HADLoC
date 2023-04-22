@@ -5,7 +5,7 @@ from .parser import Parser
 from .label_encoder import encode_labels
 from .codewriter import write_code
 
-from utils import path_without_extension
+from app.utils import path_without_extension
 
 
 def assemble(file: TextIOWrapper):
