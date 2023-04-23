@@ -11,7 +11,7 @@ on:
     branches:
       - '*'
 jobs:
-  Deploy-To-PyPi:
+  Build-Package:
     runs-on: ubuntu-latest
     steps:
       - name: Run Event
@@ -37,7 +37,7 @@ jobs:
           path: |
             build
             dist
-            hadloc.egg.info
+            hadloc.egg-info
       - name: Check version
         run: |
           code_version=$(grep ^Version: hadloc.egg-info/PKG-INFO | cut -f 2 -d ' ')
@@ -61,8 +61,12 @@ jobs:
           done
           
           echo "Version number is valid"
-
-#        if: ${{ github.event_name == 'push' }}
-#          - name: Deploy Package
-#            run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_KEY }}
       - run: echo "Successfully deployed"
+
+  Deploy-Package:
+    runs-on: ubuntu-latest
+#    if: ${{ github.event_name == 'push' }}
+    steps:
+      - name: Deploy Package
+        run: echo "Running"
+#        run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_KEY }}
