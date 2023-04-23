@@ -8,7 +8,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name='hadloc',
-    version='0.0.2',
+    version='0.0.4',
     author='Nic Prowse',
     author_email='john.doe@foo.com',
     license='GNU General Public License v3.0',
@@ -16,7 +16,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url='https://github.com/nicholasprowse/HADLoC',
-    py_modules=['controller', 'app'],
+    py_modules=['hadloc'],
     packages=find_packages(),
     install_requires=[requirements],
     python_requires='>=3.11',
@@ -26,7 +26,7 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        hadloc=controller:main
+        hadloc=hadloc.__main__:main
     ''',
     include_package_data=True
 )

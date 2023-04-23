@@ -1,2 +1,2 @@
 include LICENSE
-include app/*.json
+include hadloc/translator/parser_errors.json

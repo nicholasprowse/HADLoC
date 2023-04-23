@@ -1,7 +1,7 @@
 import os
 import pathlib
 
-from .error import FileError
+from hadloc.error import FileError
 from _io import TextIOWrapper
 from contextlib import contextmanager
 

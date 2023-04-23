@@ -1,4 +1,4 @@
-from app import writer
+from hadloc import writer
 
 
 def write_code(instructions: list[list[str | int]], file_name: str):

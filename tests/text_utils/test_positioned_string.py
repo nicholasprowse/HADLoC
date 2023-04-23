@@ -1,7 +1,7 @@
 import pytest
 
-from app.text_utils import PositionedString
-from app.text_utils.positioned_string import Coordinate
+from hadloc.text_utils import PositionedString
+from hadloc.text_utils.positioned_string import Coordinate
 
 
 @pytest.mark.parametrize(

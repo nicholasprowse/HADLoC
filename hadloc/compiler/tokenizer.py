@@ -1,9 +1,9 @@
 import os
-from app import error
+from hadloc import error
 from enum import Enum
 
-from app.error import CompilerException
-from app.text_utils import PositionedString, CodeObject, Code
+from hadloc.error import CompilerException
+from hadloc.text_utils import PositionedString, CodeObject, Code
 
 keywords = ['public', 'private', 'class', 'static', 'byte', 'char', 'bool', 'constructor', 'true', 'false', 'null',
             'import', 'void', 'new']

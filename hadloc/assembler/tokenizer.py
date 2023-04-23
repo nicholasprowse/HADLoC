@@ -1,29 +1,28 @@
 import os
-from enum import Enum
+from enum import Enum, auto
 from io import TextIOWrapper
 from typing import Optional
 
-from app import error
+from hadloc import error
 
-from app.error import CompilerException, ExceptionType
-from app.text_utils import CodeObject, LinedCode, PositionedString
-from app.text_utils.positioned_string import Coordinate
+from hadloc.error import CompilerException, ExceptionType
+from hadloc.text_utils import CodeObject, LinedCode, PositionedString
 
-keywords = ['add', 'sub', 'neg', 'and', 'or', 'not', 'eq', 'ne', 'gt', 'ge', 'lt', 'le', 'cry', 'in', 'push', 'pop',
-            'label', 'if', 'goto', 'function', 'call', 'return', 'inc', 'dec']
-segments = ['argument', 'local', 'static', 'constant', 'this', 'that', 'pointer', 'temp']
+keywords = ['lda', 'ldb', 'ldu', 'mov', 'jmp', 'jlt', 'jeq', 'jgt', 'jle', 'jge', 'jne', 'nop', 'jis', 'jcs', 'opd',
+            'opi', 'hlt', 'not', 'neg', 'inc', 'dec', 'sub', 'and', 'or', 'add', 'ics', 'icc', 'define']
 
-symbols = ['[', ']']
+registers = ['L', 'H', 'M', 'I', 'X', 'Y']
+
+symbols = [':', '+', '-', '&', '|', '!', '(', ')']
 
 
 class TokenType(Enum):
-    KEYWORD = 'keyword'
-    SEGMENT = 'memory segment'
-    IDENTIFIER = 'identifier'
-    INTEGER = 'integer'
-    SYMBOL = 'symbol'
-    INSTRUCTION_END = 'line break'
-    PROGRAM_END = 'program end'
+    KEYWORD = auto()
+    IDENTIFIER = auto()
+    INTEGER = auto()
+    REGISTER = auto()
+    SYMBOL = auto()
+    INSTRUCTION_END = auto()
 
 
 class Token(CodeObject):
@@ -34,12 +33,12 @@ class Token(CodeObject):
 
 class Tokenizer:
     """
-    Used for tokenizing a virtual machine file. Takes the raw text from the vm file as a string, and generates a 2
+    Used for tokenizing an assembly file. Takes the raw text from the assembly file as a string, and generates a 2
     dimensional list of tokens, stored in the variable tokens. The tokens list is structured so that each line in the
     code is in a separate row of the 2 dimensional list. Each row contains a series of tokens. Each token contains a
     token type and a value
 
-    There are 5 types of token: 'keyword', 'segment', 'identifier', 'integer', 'instruction end'
+    There are 6 types of token: 'keyword', 'identifier', 'register', 'symbol', 'integer', 'instruction end'
 
     More information about what constitutes each type of token can be found in the documentation for the functions
     that tokenize them (e.g. Tokenizer.tokenize_label()).
@@ -77,13 +76,10 @@ class Tokenizer:
         self.skip_whitespace_and_comments()
         while self.code.has_more():
             if self.tokenize_int() is None and \
-                    self.tokenize_keyword_identifier() is None \
-                    and self.tokenize_symbol() is None:
+                    self.tokenize_keyword_identifier_register() is None and \
+                    self.tokenize_symbol() is None:
                 raise CompilerException(ExceptionType.SYNTAX, self.code[0], 'Unexpected character')
             self.skip_whitespace_and_comments()
-
-        self.end_instruction()
-        self.tokens.append(Token(TokenType.PROGRAM_END))
         return self.tokens
 
     def addtoken(self, token_type: TokenType, text: PositionedString, value: Optional[int | str] = None) -> Token:
@@ -104,15 +100,10 @@ class Tokenizer:
 
         # Add INSTRUCTION_END if the new token is on a different line to the previous one
         if len(self.tokens) > 0 and self.tokens[-1].line() != text.line():
-            self.end_instruction()
+            self.tokens.append(Token(TokenType.INSTRUCTION_END))
 
         self.tokens.append(Token(token_type, CodeObject(value, text)))
         return self.tokens[-1]
-
-    def end_instruction(self):
-        last_coord = self.tokens[-1].coordinates[-1]
-        string = PositionedString(' ', [Coordinate(last_coord.line, last_coord.column + 1)])
-        self.tokens.append(Token(TokenType.INSTRUCTION_END, CodeObject(None, string)))
 
     def skip_whitespace_and_comments(self):
         """
@@ -135,14 +126,15 @@ class Tokenizer:
             elif not self.code.advance_line():
                 return
 
-    def tokenize_keyword_identifier(self) -> Token | None:
+    def tokenize_keyword_identifier_register(self) -> Token | None:
         """
-        Tokenizes an instance of a command, segment or identifier. Will only tokenize one token.
+        Tokenizes an instance of a keyword, identifier or register. Will only tokenize one token.
         A keyword is one of:
-            TODO add list of commands
+            ('lda', 'ldb', 'mov', 'jmp', 'jlt', 'jeq', 'jgt', 'jle', 'jge', 'jne', 'nop', 'jcs', 'jis', 'opd',
+            'opi', 'hlt', 'not', 'neg', 'inc', 'dec', 'sub', 'and', 'or', 'add', 'icc', 'ics', 'define')
 
-        A segment represents a memory segment and is one of:
-            ('argument', 'local', 'static', 'constant', 'this', 'that', 'pointer', 'temp')
+        A register is one of:
+            ('L', 'H', 'M', 'I', 'X', 'Y')
 
         An identifier is any other sequence of alphanumeric characters or underscores, where the first character is
         not a numeric character.
@@ -164,14 +156,14 @@ class Tokenizer:
         if word in keywords:
             return self.addtoken(TokenType.KEYWORD, word)
 
-        if word in segments:
-            return self.addtoken(TokenType.SEGMENT, word)
+        if word in registers:
+            return self.addtoken(TokenType.REGISTER, word)
 
         return self.addtoken(TokenType.IDENTIFIER, word)
 
     def tokenize_symbol(self) -> Token | None:
         """
-        Tokenizes a symbol. Allowed symbols are: '[', ']'
+        Tokenizes a symbol. Allowed symbols are: '+', '-', '&', '|', '!', '(', ')' and ':'
 
         Returns: The token generated, or None if no token was created
         """

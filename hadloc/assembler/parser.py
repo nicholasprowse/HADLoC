@@ -1,6 +1,6 @@
-from app.assembler.tokenizer import Token, TokenType
-from app.error import CompilerException, ExceptionType
-from app.text_utils import CodeObject, PositionedString, add
+from hadloc.assembler.tokenizer import Token, TokenType
+from hadloc.error import CompilerException, ExceptionType
+from hadloc.text_utils import CodeObject, PositionedString, add
 
 
 class Parser:

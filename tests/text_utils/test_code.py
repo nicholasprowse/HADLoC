@@ -1,7 +1,7 @@
-from app.text_utils import Code
+from hadloc.text_utils import Code
 import pytest
 
-from app.text_utils.positioned_string import Coordinate
+from hadloc.text_utils.positioned_string import Coordinate
 
 lorem_ipsum = 'Lorem ipsum dolor sit amet,\n consectetur adipiscing elit.\n Donec mollis.'
 length = len(lorem_ipsum.replace('\n', ''))

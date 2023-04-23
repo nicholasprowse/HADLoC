@@ -1,5 +1,5 @@
 from .tokenizer import Token
-from app.error import CompilerException
+from hadloc.error import CompilerException
 
 
 class Parser:

@@ -9,12 +9,12 @@ from serial.tools import list_ports
 from serial import SerialException
 import serial
 
-from app import writer
-from app.assembler import assemble
-from app.error import HADLOCException, ExceptionType, FileError
-from app.translator import translate
-from app.utils import get_file_name, extension
-import app.emulator.display
+from hadloc import writer
+from hadloc.assembler import assemble
+from hadloc.error import HADLOCException, ExceptionType, FileError
+# from hadloc.translator import translate
+from hadloc.utils import get_file_name, extension
+from hadloc.emulator import display
 
 
 # TODO Serial read can raise a SerialError if the connection is lost mid read. Should catch these errors
@@ -135,7 +135,9 @@ def execute_compile(args, program_name):
     if file_ext == 'hdc':
         warnings, files = assemble(args.file)
     elif file_ext == 'vm':
-        warnings, files = translate(args.file)
+        print('VM compilation is not supported yet, but it is coming soon!')
+        raise SystemExit
+        # warnings, files = translate(args.file)
     else:
         raise FileError(args.file.name, "File must have '.hdc' or '.vm' extension")
 
@@ -360,7 +362,7 @@ def main():
                                       'one by one, and register/memory contents are shown')
     emulator_parser.add_argument('file', type=argparse.FileType('rb'),
                                  help='Binary file to execute. Must contain HADLoC machine code')
-    emulator_parser.set_defaults(func=app.emulator.display.start)
+    emulator_parser.set_defaults(func=display.start)
 
     args = parser.parse_args()
 

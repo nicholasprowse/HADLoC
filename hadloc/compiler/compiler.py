@@ -1,6 +1,6 @@
 from .tokenizer import tokenize
 from .parser import Parser
-from app.utils import verify_file
+from hadloc.utils import verify_file
 
 
 def jcompile(file):
