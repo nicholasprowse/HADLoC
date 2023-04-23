@@ -68,6 +68,11 @@ jobs:
     needs: Build-Package
 #    if: ${{ github.event_name == 'push' }}
     steps:
+      - name: Download a single artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: package
+      - run: ls
       - name: Deploy Package
         run: echo "Running"
 #        run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_KEY }}
