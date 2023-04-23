@@ -9,7 +9,7 @@ on:
       - master
   workflow_dispatch:
     branches:
-      - *
+      - '*'
 jobs:
   Deploy-To-PyPi:
     runs-on: ubuntu-latest
