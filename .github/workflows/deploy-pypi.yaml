@@ -14,13 +14,14 @@ jobs:
           python-version: '3.11'
       - name: Install Python Dependencies
         run: |
+          pip install --upgrade pip
           pip install wheel
           pip install twine
           pip install setuptools
       - name: Check out repository code
         uses: actions/checkout@v3
-      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+      - name: Build Package
+        run: python3 setup.py sdist bdist_wheel
       - name: List files in the repository
         run: |
           ls ${{ github.workspace }}
