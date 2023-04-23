@@ -8,7 +8,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name='hadloc',
-    version='0.1.0',
+    version='0.1.1',
     author='Nic Prowse',
     license='GNU General Public License v3.0',
     description='Command line tool to build, emulate and load programs for the HaDLOC 8-bit computer',
@@ -22,6 +22,14 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 3.11",
         "Operating System :: OS Independent",
+        "Development Status :: 3 - Alpha",
+        "Environment :: Console"
+        "Environment :: Console :: Curses",
+        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+        "Natural Language :: English",
+        "Topic :: Software Development :: Assemblers",
+        "Topic :: Software Development :: Compilers",
+        "Topic :: System :: Emulators"
     ],
     entry_points='''
         [console_scripts]
