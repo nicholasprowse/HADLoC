@@ -22,6 +22,14 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 3.11",
         "Operating System :: OS Independent",
+        "Development Status :: 3 - Alpha",
+        "Environment :: Console"
+        "Environment :: Console :: Curses",
+        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+        "Natural Language :: English",
+        "Topic :: Software Development :: Assemblers",
+        "Topic :: Software Development :: Compilers",
+        "Topic :: System :: Emulators"
     ],
     entry_points='''
         [console_scripts]
