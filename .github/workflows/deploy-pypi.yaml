@@ -30,6 +30,14 @@ jobs:
         uses: actions/checkout@v3
       - name: Build Package
         run: python3 setup.py sdist bdist_wheel
+      - name: Store build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: package
+          path: |
+            build
+            dist
+            hadloc.egg.info
       - name: Check version
         run: |
           code_version=$(grep ^Version: hadloc.egg-info/PKG-INFO | cut -f 2 -d ' ')
@@ -53,7 +61,8 @@ jobs:
           done
           
           echo "Version number is valid"
-        if: ${{ github.event_name == 'push' }}
-          - name: Deploy Package
-            run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_KEY }}
+
+#        if: ${{ github.event_name == 'push' }}
+#          - name: Deploy Package
+#            run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_KEY }}
       - run: echo "Successfully deployed"
