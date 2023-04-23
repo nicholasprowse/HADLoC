@@ -7,6 +7,9 @@ on:
   pull_request:
     branches:
       - master
+  workflow_dispatch:
+    branches:
+      - *
 jobs:
   Deploy-To-PyPi:
     runs-on: ubuntu-latest
@@ -37,7 +40,7 @@ jobs:
             version=$(echo "$version_list" | cut -d , -f 1)
             if [[ $code_version = "$version" ]]
             then
-              echo "Version already exists in PyPi repo, please update the version number"
+              echo "Version $code_version already exists in PyPi repo, please update the version number"
               exit 1
             fi
           
@@ -50,6 +53,7 @@ jobs:
           done
           
           echo "Version number is valid"
-#      - name: Deploy Package
-#        run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_KEY }}
+        if: ${{ github.event_name == 'push' }}
+          - name: Deploy Package
+            run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_KEY }}
       - run: echo "Successfully deployed"
