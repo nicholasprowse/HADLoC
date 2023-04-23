@@ -1,5 +1,5 @@
 name: Deploy to PyPi
-run-name: Deploy to PyPi
+run-name: ${{ github.event_name }} - Deploy to PyPi
 on:
   push:
     branches:
@@ -14,8 +14,6 @@ jobs:
   Build-Package:
     runs-on: ubuntu-latest
     steps:
-      - name: Run Event
-        run: echo ${{ github.event_name }}
       - name: Install Python
         uses: actions/setup-python@v4
         with:
@@ -24,7 +22,6 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install wheel
-          pip install twine
           pip install setuptools
       - name: Check out repository code
         uses: actions/checkout@v3
@@ -71,6 +68,13 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: package
-      - run: ls
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install Python Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install twine
       - name: Deploy Package
         run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_KEY }}
