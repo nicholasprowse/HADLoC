@@ -60,13 +60,12 @@ jobs:
             fi
           done
           
-          echo "Version number is valid"
-      - run: echo "Successfully deployed"
+          echo "Version $code_version is valid"
 
   Deploy-Package:
     runs-on: ubuntu-latest
     needs: Build-Package
-#    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' }}
     steps:
       - name: Download a single artifact
         uses: actions/download-artifact@v3
@@ -74,5 +73,4 @@ jobs:
           name: package
       - run: ls
       - name: Deploy Package
-        run: echo "Running"
-#        run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_KEY }}
+        run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_KEY }}
