@@ -1,38 +1,36 @@
 from typing import Callable, Any, TypeVar
 
-from hadloc.grammar.abstract_syntax_tree import ASTNode
-from hadloc.grammar.token_list import TokenList
+from hadloc.error import CompilerException, ExceptionType
+from .abstract_syntax_tree import ASTNode
+from .token_list import TokenList
 
 from abc import ABC, abstractmethod
 
 T = TypeVar('T')
+GrammarSymbolType = TypeVar('GrammarSymbolType', bound='GrammarSymbol')
 
 
-class GrammarException(Exception):
-    """
-    Let every terminal have an error message
-    By default, the terminal parsing the last successful token determines the error
-    However, if the last token is the first in a sequential or repeated symbol, then parsing of this symbol
-    didn't even start -> show error for that symbol
+"""
+Let every terminal have an error message
+By default, the terminal parsing the last successful token determines the error
+However, if the last token is the first in a sequential or repeated symbol, then parsing of this symbol
+didn't even start -> show error for that symbol
 
-    i.e.    Terminal fails: pass up it's error
-            Repeated/Sequential fails: Pass up its own error only if no symbols were parsed, otherwise pass up the error
-            of the first symbol that didn't parse
-            AnyOf fails: Probably will work the same as the repeated/sequential
+i.e.    Terminal fails: pass up it's error
+        Repeated/Sequential fails: Pass up its own error only if no symbols were parsed, otherwise pass up the error
+        of the first symbol that didn't parse
+        AnyOf fails: Probably will work the same as the repeated/sequential
 
-    Note:   Using these rules, an error on a sequential will only ever be used if it's parent is also a sequential,
-        which will rarely happen. That is because, if the Sequential parsed no tokens, meaning it passes up it's error,
-        then the parent (AnyOf or Repeated) will either use the error from another symbol that parsed more tokens, or
-        use its own error, since no children parsed any tokens
-            Similarly, a Repeated will only use its error if min_matches is non-zero, as a Repeated symbol cannot fail
-            if min_matches is zero (but its children can fail, so their error could be used)
+Note:   Using these rules, an error on a sequential will only ever be used if it's parent is also a sequential,
+    which will rarely happen. That is because, if the Sequential parsed no tokens, meaning it passes up it's error,
+    then the parent (AnyOf or Repeated) will either use the error from another symbol that parsed more tokens, or
+    use its own error, since no children parsed any tokens
+        Similarly, a Repeated will only use its error if min_matches is non-zero, as a Repeated symbol cannot fail
+        if min_matches is zero (but its children can fail, so their error could be used)
 
-    Thus, Sequential rarely needs an error (only if its parent is also a Sequential), and Optional and ZeroOrMore never
-    need an error
-    """
-    def __init__(self, msg: str, token_offset: int):
-        self.token_offset = token_offset
-        self.msg = msg
+Thus, Sequential rarely needs an error (only if its parent is also a Sequential), and Optional and ZeroOrMore never
+need an error
+"""
 
 
 class GrammarSymbol(ABC):
@@ -44,11 +42,20 @@ class GrammarSymbol(ABC):
     Args:
         name: The name of the symbol
     """
-    def __init__(self, name: str = None, error: str | Callable[[ASTNode], str] | None = None, auto_name: bool = False):
+    def __init__(self,
+                 name: str = None,
+                 error: str | Callable[[list[ASTNode]], str] | None = None,
+                 auto_name: bool = False):
         self.name = name
-        self.error_msg = error
-        self.error: GrammarException | None = None
+        self.error_msg = ''
+        self.error_offset = 0
         self.auto_name = auto_name
+        if isinstance(error, str):
+            self.error_generator = lambda nodes: error
+        elif error is None:
+            self.error_generator = lambda nodes: 'Unexpected token'
+        else:
+            self.error_generator = error
 
     def assign_name(self, parent_node: ASTNode, match: Any):
         if not self.auto_name or parent_node.node_type is not None:
@@ -63,21 +70,39 @@ class GrammarSymbol(ABC):
                 return
             match = match.children[0]
 
-    def create_node(self) -> ASTNode:
-        return ASTNode(self.name)
+    def create_error(self, error_offset: int, parent_nodes: list[ASTNode]):
+        self.error_offset = error_offset
+        self.error_msg = self.error_generator(parent_nodes)
 
-    def create_error(self, offset: int, parent_nodes: list[ASTNode]):
-        if isinstance(self.error_msg, Callable):
-            return GrammarException(self.error_msg(parent_nodes), offset)
-        else:
-            return GrammarException(self.error_msg if self.error_msg is not None else 'Unexpected token', offset)
-
-    def process_error(self, error: GrammarException):
-        if error is None:
+    def process_error(self, matched_symbol: GrammarSymbolType):
+        if matched_symbol is None:
             return
 
-        if self.error is None or self.error.token_offset < error.token_offset:
-            self.error = error
+        if self.error_offset < matched_symbol.error_offset:
+            self.error_offset = matched_symbol.error_offset
+            self.error_msg = matched_symbol.error_msg
+
+    def parse(self, tokens: list[T]) -> ASTNode[T]:
+        """
+        Parses a given list of tokens according to this grammar. Similar to the match method, however it is intended
+        for the top level grammar that should match the entire list of tokens. It determines if the list of tokens
+        matches the grammar and generates an ASTNode representing the tokens. However, if the tokens do not match the
+        grammar, it raises a CompilerException with the token that caused the failure, along with the error message
+        provided by the GrammarSymbol where the failure occurred. Also, unlike the match method, this method requires
+        the entire token list to match the grammar. If the entire token list is not consumed during parsing,
+        then a CompilerException is raise with the same information about where the matching failed Args: tokens:
+        List of tokens to parse
+
+        Returns: The ASTNode representing the structure of the program according to this grammar
+
+        Raises:
+            CompilerException: If the token list does not completely match the grammar
+        """
+        token_list = TokenList(tokens)
+        ast = self.match(token_list, [])
+        if ast is None or token_list.offset < len(tokens):
+            raise CompilerException(ExceptionType.SYNTAX, tokens[self.error_offset], self.error_msg)
+        return ast
 
     @abstractmethod
     def match(self, tokens: TokenList[T], parent_nodes: list[ASTNode]) -> ASTNode[T] | None:
@@ -109,10 +134,10 @@ class Sequential(GrammarSymbol):
 
     def match(self, tokens: TokenList[T], parent_nodes: list[ASTNode]) -> ASTNode[T] | None:
         start_offset = tokens.offset
-        node = self.create_node()
+        node = ASTNode(self.name)
         for symbol in self.symbols:
             match = symbol.match(tokens, parent_nodes + [node])
-            self.process_error(symbol.error)
+            self.process_error(symbol)
 
             if match is not None:
                 self.assign_name(node, match)
@@ -122,8 +147,8 @@ class Sequential(GrammarSymbol):
 
                 # If no symbols managed to parse past the current token, use this error, otherwise use the error from
                 # the symbol that parsed the furthest
-                if tokens.offset == self.error.token_offset:
-                    self.error = self.create_error(tokens.offset, parent_nodes + [node])
+                if tokens.offset == self.error_offset:
+                    self.create_error(tokens.offset, parent_nodes + [node])
                 return None
         return node
 
@@ -151,11 +176,11 @@ class Repeated(GrammarSymbol):
 
     def match(self, tokens: TokenList[T], parent_nodes: list[ASTNode]) -> ASTNode[T] | None:
         start_offset = tokens.offset
-        node = self.create_node()
+        node = ASTNode(self.name)
         num_matches = 0
         while self.max_matches is None or num_matches < self.max_matches:
             match = self.symbol.match(tokens, parent_nodes + [node])
-            self.process_error(self.symbol.error)
+            self.process_error(self.symbol)
 
             if match is not None:
                 self.assign_name(node, match)
@@ -168,8 +193,8 @@ class Repeated(GrammarSymbol):
 
                 # If no symbols managed to parse past the current token, use this error, otherwise use the error from
                 # the symbol that parsed the furthest
-                if tokens.offset == self.error.token_offset:
-                    self.error = self.create_error(tokens.offset, parent_nodes + [node])
+                if tokens.offset == self.error_offset:
+                    self.create_error(tokens.offset, parent_nodes + [node])
                 return None
         return node
 
@@ -204,16 +229,15 @@ class AnyOf(GrammarSymbol):
     def match(self, tokens: TokenList[T], parent_nodes: list[ASTNode]) -> ASTNode[T] | None:
         for symbol in self.symbols:
             match = symbol.match(tokens, parent_nodes)
-
-            self.process_error(symbol.error)
+            self.process_error(symbol)
 
             if match is not None:
                 return match
 
         # If no symbols managed to parse past the current token, use this error, otherwise use the error from the
         # symbol that parsed the furthest
-        if tokens.offset == self.error.token_offset:
-            self.error = self.create_error(tokens.offset, parent_nodes)
+        if tokens.offset == self.error_offset:
+            self.create_error(tokens.offset, parent_nodes)
         return None
 
 
@@ -228,11 +252,13 @@ class Terminal(GrammarSymbol):
         self.predicate = predicate
 
     def match(self, tokens: TokenList[T], parent_nodes: list[ASTNode]) -> ASTNode[T] | None:
+        if not tokens.has_more():
+            return None
         token = tokens[0]
         if self.predicate(token):
             tokens.offset += 1
             node = ASTNode(self.name, token)
             self.assign_name(node, token)
             return node
-        self.error = self.create_error(tokens.offset, parent_nodes)
+        self.create_error(tokens.offset, parent_nodes)
         return None

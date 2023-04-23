@@ -23,7 +23,6 @@ class TokenType(Enum):
     INTEGER = 'integer'
     SYMBOL = 'symbol'
     INSTRUCTION_END = 'line break'
-    PROGRAM_END = 'program end'
 
 
 class Token(CodeObject):
@@ -83,7 +82,6 @@ class Tokenizer:
             self.skip_whitespace_and_comments()
 
         self.end_instruction()
-        self.tokens.append(Token(TokenType.PROGRAM_END))
         return self.tokens
 
     def addtoken(self, token_type: TokenType, text: PositionedString, value: Optional[int | str] = None) -> Token:

@@ -24,7 +24,11 @@ For more details about the languages and computer checkout the Specifications fo
 
 ## Installation
 
-TODO
+hadloc requires Python 3.11 or later to run.
+
+To install, execute `pip install hadloc`.
+
+To verify installation, type `hadloc`, which should display help on how to use the tool
 
 ## Usage
 

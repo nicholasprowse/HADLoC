@@ -151,6 +151,5 @@ def instruction():
 def vm_program():
     return Sequential(
         ZeroOrMore(instruction()),
-        Terminal(lambda x: x.token_type == TokenType.PROGRAM_END),
         name='program'
     )

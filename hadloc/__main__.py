@@ -12,7 +12,7 @@ import serial
 from hadloc import writer
 from hadloc.assembler import assemble
 from hadloc.error import HADLOCException, ExceptionType, FileError
-# from hadloc.translator import translate
+from hadloc.translator import translate
 from hadloc.utils import get_file_name, extension
 from hadloc.emulator import display
 
@@ -135,9 +135,9 @@ def execute_compile(args, program_name):
     if file_ext == 'hdc':
         warnings, files = assemble(args.file)
     elif file_ext == 'vm':
-        print('VM compilation is not supported yet, but it is coming soon!')
-        raise SystemExit
-        # warnings, files = translate(args.file)
+        # print('VM compilation is not supported yet, but it is coming soon!')
+        # raise SystemExit
+        warnings, files = translate(args.file)
     else:
         raise FileError(args.file.name, "File must have '.hdc' or '.vm' extension")
 
