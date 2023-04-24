@@ -19,21 +19,28 @@ class ASTNode(Generic[T]):
     node as a child to another, it will add all of this node's children, rather than adding the node itself. This is
     useful in removing nodes which are required for parsing, but don't provide any extra information
 
+    If auto_name is set to true, then this node will be named after the string value of the value attribute of the first
+    descendant added to this node. Note that the node this ends up being named after may not end up being a child, as it
+    may have a None node type. Auto naming will not overwrite a node type unless it is None
+
     Args:
         node_type: The type of the node. If None, then this node will not be included in the AST (but its children
             will be provided they have a non None type)
-        value: The value of the node. This is optional, and should only be included for terminal nodes
+        value: The value of the node. This is optional, and should only be included for terminal nodes.
+        auto_name: If true, sets the node type automatically based on the value of the first terminal descendant added
 
     Attributes:
         node_type: See args
         value: See args
+        auto_name: See args
         children: A list of ASTNodes which contain the nodes required to describe this node. Should not be directly
             mutated, instead use add_child to add children. This ensures None node types are handled correctly
     """
-    def __init__(self, node_type: str, value: T | None = None):
+    def __init__(self, node_type: str, auto_name: bool, value: T | None = None):
         self.children = []
         self.node_type = node_type
         self.value = value
+        self.auto_name = auto_name
 
     def add_child(self, child: Self):
         """
@@ -42,9 +49,20 @@ class ASTNode(Generic[T]):
         recursively added using this function (i.e. only not None node types will be in the final AST, and they will be
         added to the nearest ancestor that has a not None node type)
 
+        If auto naming is on, then this is determined here. If the node type is None, then the node type is set to the
+        value of first terminal descendant of the child, regardless of if the child's type is None or not
+
         Args:
             child: the node to add
         """
+        # Auto naming
+        if self.auto_name and self.node_type is None:
+            node = child
+            while len(node.children) > 0:
+                node = node.children[0]
+            self.node_type = str(node.value)
+
+        # Add child
         if child.node_type is not None:
             self.children.append(child)
         else:

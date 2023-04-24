@@ -1,7 +1,7 @@
 import json
 from typing import Callable
 
-from hadloc.grammar import Terminal, Sequential, Optional, AnyOf, ZeroOrMore, Repeated
+from hadloc.grammar import Terminal, Sequential, Optional, OneOf, ZeroOrMore, Repeated
 from hadloc.grammar.abstract_syntax_tree import ASTNode
 from hadloc.translator.tokenizer import TokenType
 from hadloc.utils import local_open
@@ -58,7 +58,7 @@ def function_call():
 def push():
     return Sequential(
         keyword('push'),
-        AnyOf(
+        OneOf(
             integer('constant'),
             memory_segment(),
             error=ERRORS['push argument']
@@ -84,8 +84,8 @@ def label():
 
 def binary_operation():
     return Sequential(
-        AnyOf(*[keyword(kw) for kw in ['add', 'sub', 'and', 'or', 'eq', 'ne', 'le', 'lt', 'ge', 'gt']]),
-        Repeated(AnyOf(
+        OneOf(*[keyword(kw) for kw in ['add', 'sub', 'and', 'or', 'eq', 'ne', 'le', 'lt', 'ge', 'gt']]),
+        Repeated(OneOf(
             integer('constant'),
             memory_segment(),
             error=lambda x: ERRORS['binary operator argument'].format(x[-2].node_type)
@@ -96,8 +96,8 @@ def binary_operation():
 
 def unary_operation():
     return Sequential(
-        AnyOf(keyword('neg'), keyword('not'), keyword('inc'), keyword('dec')),
-        Optional(AnyOf(
+        OneOf(*[keyword(kw) for kw in ['neg', 'not', 'inc', 'dec']]),
+        Optional(OneOf(
             integer('constant'),
             memory_segment(),
             error=lambda x: ERRORS['unary operator argument'].format(x[-2].node_type)
@@ -118,9 +118,9 @@ def goto(error: str | None = None):
 def if_goto():
     return Sequential(
         keyword('if'),
-        Optional(AnyOf(
+        Optional(OneOf(
             memory_segment(),
-            AnyOf(*[keyword(kw, name='condition') for kw in ['eq', 'ne', 'le', 'lt', 'ge', 'gt']]),
+            *[keyword(kw, name='condition') for kw in ['eq', 'ne', 'le', 'lt', 'ge', 'gt']],
             error=ERRORS['if argument']
         )),
         goto(error=ERRORS['if goto']),
@@ -131,7 +131,7 @@ def if_goto():
 def return_statement():
     return Sequential(
         keyword('return'),
-        Optional(AnyOf(
+        Optional(OneOf(
             integer('constant'),
             memory_segment(),
             error=lambda x: ERRORS['return argument'].format(x[-2].node_type)
@@ -142,7 +142,7 @@ def return_statement():
 
 def instruction():
     return Sequential(
-        AnyOf(function_definition(), function_call(), push(), pop(), label(),
+        OneOf(function_definition(), function_call(), push(), pop(), label(),
               binary_operation(), unary_operation(), goto(), if_goto(), return_statement()),
         Terminal(lambda x: x.token_type == TokenType.INSTRUCTION_END)
     )

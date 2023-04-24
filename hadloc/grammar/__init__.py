@@ -1,1 +1,1 @@
-from .grammar import Terminal, Sequential, Repeated, AnyOf, GrammarSymbol, Optional, OneOrMore, ZeroOrMore
+from .grammar import Terminal, Sequential, Repeated, OneOf, GrammarSymbol, Optional, OneOrMore, ZeroOrMore
